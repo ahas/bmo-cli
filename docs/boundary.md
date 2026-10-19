@@ -360,7 +360,7 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 
 | Command | Alias | Status |
 |---|---|---|
-| `reminder list` | `reminders` | not served yet |
+| `reminder list` | `reminders` | carried: `POST /reminders/list`, and with `--cancel` `POST /reminders/cancel` |
 | `memory` | | carried: `POST /memory/add`, `/update`, `/done`, `/retire`, `/revive`, `/candidate` and `/list`, by its verb |
 | `note` | | carried: `POST /notes/add` |
 | `fragment` | | carried: `GET /fragments` to list, `POST /fragments/check`, `/sync`, `/write` and `/remove` |
@@ -372,7 +372,10 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 | `brain wait` | | carried: `POST /brain/wait` |
 
 - **The reminders a room holds** are bmo-brain's: its `POST /reminders/list` and `POST /reminders/cancel` are
-  what `reminder list` and its `--cancel` call, as the receiver's documents say.
+  what `reminder list` and its `--cancel` call, as the receiver's documents say. `reminder list --chat
+  <chatId> [--all]` asks the room's reminders of every agent (`agent` null) and prints the `lines` the brain
+  reads them back with, `(no reminders)` where there are none; `--cancel <id>` prints the brain's reading,
+  and its refusal on standard error with 1. Neither is home-bound.
 - **The settings:** `[unit.bmo-brain]` with `address` and `token`. Every call takes the brain's token; the
   wait for its editing locks is given ten minutes, every other call one.
 - **The agent** a call is for is its `--agent`, else the turn's (「The turn」); `memory`, `note` and

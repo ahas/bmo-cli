@@ -364,3 +364,50 @@ fn a_brain_the_settings_do_not_reach_is_refused_naming_the_setting() {
     "bmo: `brain hold` cannot be asked of bmo-brain: the settings name no `unit.bmo-brain.address`\n"
   );
 }
+
+#[test]
+fn a_rooms_reminders_are_listed_as_a_session_reads_them_and_one_is_called_off() {
+  let stub = Stub::answering(&[
+    (
+      "/reminders/list",
+      200,
+      json!({ "reminders": [{ "id": 3 }], "lines": ["#3 2026-10-20 09:00 stretch"] }),
+    ),
+    ("/reminders/cancel", 200, reading(&["cancelled #3"])),
+  ]);
+  let bench = reaching(&stub);
+
+  let listed = bench.bmo(&["reminder", "list", "--chat", "5", "--all"]);
+  let cancelled = bench.bmo(&["reminder", "list", "--cancel", "3"]);
+
+  assert_eq!(lines(&listed), ["#3 2026-10-20 09:00 stretch"]);
+  assert_eq!(lines(&cancelled), ["cancelled #3"]);
+  assert_eq!(
+    stub.asked().into_iter().map(|asked| (asked.path, asked.body)).collect::<Vec<_>>(),
+    [
+      ("/reminders/list".to_owned(), json!({ "chatId": 5, "agent": null, "all": true })),
+      ("/reminders/cancel".to_owned(), json!({ "id": 3 })),
+    ]
+  );
+}
+
+#[test]
+fn no_reminders_and_one_the_brain_does_not_hold_are_said_so() {
+  let stub = Stub::answering(&[
+    ("/reminders/list", 200, json!({ "reminders": [], "lines": [] })),
+    (
+      "/reminders/cancel",
+      200,
+      json!({ "answered": false, "refusal": { "code": "no-reminder", "message": "no reminder #9" } }),
+    ),
+  ]);
+  let bench = reaching(&stub);
+
+  let none = bench.bmo(&["reminder", "list", "--chat", "5"]);
+  let unknown = bench.bmo(&["reminder", "list", "--cancel", "9"]);
+  let unread = bench.bmo(&["reminder", "list"]);
+
+  assert_eq!(lines(&none), ["(no reminders)"]);
+  assert_eq!((unknown.status.code(), errors(&unknown)), (Some(1), "no reminder #9\n".to_owned()));
+  assert_eq!(unread.status.code(), Some(2));
+}

@@ -271,6 +271,18 @@ struct DigestPeople {
   forget_read: bool,
 }
 
+/// A room's reminders still to come, or every one with --all; or one called off with --cancel.
+#[derive(Parser)]
+#[command(name = "bmo reminder list", no_binary_name = true, allow_negative_numbers = true)]
+struct Reminders {
+  #[arg(long, required_unless_present = "cancel")]
+  chat: Option<i64>,
+  #[arg(long)]
+  all: bool,
+  #[arg(long)]
+  cancel: Option<i64>,
+}
+
 struct Brain;
 
 impl Carried for Brain {
@@ -289,6 +301,7 @@ impl Carried for Brain {
       "digest now",
       "brain hold",
       "brain wait",
+      "reminder list",
     ]
   }
 
@@ -307,6 +320,7 @@ impl Carried for Brain {
       "digest people" => digest_people(&service, read(call.rest)),
       "digest now" => digest_now(&service, read(call.rest)),
       "brain hold" => brain_hold(&service),
+      "reminder list" => reminders(&service, read(call.rest)),
       _ => brain_wait(&service),
     }
   }
@@ -1059,4 +1073,23 @@ fn brain_wait(service: &Service) -> ExitCode {
     }
     Err(why) => refused(&why),
   }
+}
+
+// A room's reminders listed as a session reads them back, every room's agent among them, or one called off.
+fn reminders(service: &Service, asked: Reminders) -> ExitCode {
+  let answered = match (asked.cancel, asked.chat) {
+    (Some(id), _) => {
+      service.post("/reminders/cancel", &json!({ "id": id })).and_then(|said| reading(&said))
+    }
+    (None, Some(chat)) => service
+      .post("/reminders/list", &json!({ "chatId": chat, "agent": null, "all": asked.all }))
+      .map(|said| {
+        let lines = lines_of(&said);
+
+        if lines.is_empty() { vec!["(no reminders)".to_owned()] } else { lines }
+      }),
+    (None, None) => Err("usage: bmo reminder list --chat <chatId> [--all] | --cancel <id>".to_owned()),
+  };
+
+  printed(answered)
 }
