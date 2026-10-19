@@ -10,8 +10,9 @@ These rules hold every change to this repository.
   true now, and the code is written to match.
 - A document states what is true now: no change history, no rationale told through an earlier
   design, no pasted source, signature or config fragment, and no file-and-line pins.
-- A document names no file outside this repository. Another unit is named by its name, and what it
-  keeps is its own documents' to state.
+- A document names no file outside this repository, but for `docs/inventory.md`, which accounts for the
+  single repository's files. Another unit is named by its name, and what it keeps is its own documents'
+  to state.
 
 ## Boundaries
 
