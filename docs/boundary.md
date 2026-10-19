@@ -423,8 +423,16 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 
 | Command | Alias | Status |
 |---|---|---|
-| `node list` | `nodes` | not served yet |
-| `node hardware` | `hardware-setup` | not served yet |
+| `node list` | `nodes` | carried: handed to `bmo-node` as `node`, after its configuration |
+| `node hardware` | `hardware-setup` | carried: handed to `bmo-node` as `hardware-setup`, after its configuration |
+
+- **The words:** `bmo-node --config <file> node <the rest>` and `bmo-node --config <file> hardware-setup
+  <the nodes>`, as bmo-node's documents give its command; the road is not handed on.
+- **The settings:** `[unit.bmo-node]` with `config`, the path of the configuration file the `bmo-node`
+  command reads; a call whose settings name none is refused with 2, naming the setting.
+- **Home-bound:** `node list` (「The home-bound commands」).
+- **Asked of bmo-node:** its command answers `nouns` and reads its configuration where no `--config` is
+  given, so its commands reach it without this repository carrying them.
 
 ### bmo-word-chain (1)
 
