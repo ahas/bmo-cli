@@ -8,7 +8,8 @@ the way git finds `git-<command>`. A unit added later needs no new build of `bmo
 
 | Folder | Holds |
 |---|---|
-| `src/` | The binary `bmo` |
+| `src/` | The library that reads the words, finds the unit commands and their nouns, resolves a command and hands it on, the modules carrying a unit's commands, and the binary `bmo` |
+| `tests/` | The contract's tests, each running the built `bmo` against stand-in unit commands in a directory of its own |
 | `docs/` | The canonical statements of what `bmo` does |
 
 At the root stand the Cargo manifest, the version, `testbed.toml` (bmo-testbed's declaration of how this

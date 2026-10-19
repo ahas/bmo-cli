@@ -19,18 +19,21 @@ it answers itself, and, command by command, where every command of the platform'
 - **A unit command is an executable file named `bmo-<name>`.** `bmo` looks for them first in the
   directory holding `bmo` itself, then in each directory of `PATH` in order. Where one name stands in
   several places, the first one found is the unit command of that name and the rest are not read.
+- **Every such executable is taken for a unit command** and asked `nouns`, so a program that is not one,
+  a service's own server binary among them, is not installed under a `bmo-` name in those directories.
 - **A unit command declares its nouns** when asked with the one word `nouns`: it prints every noun it
   carries, one a line. A noun of two words is the two words with one space between them. A line may
   carry marks after a tab, separated by spaces; a mark `bmo` does not know is passed over.
 - **The mark `home`** says the noun's commands run on the operations machine. Where a run is asked on a
   work node, `bmo` hands such a command to the home bridge (「The home bridge」).
-- **How `nouns` is asked:** with standard input closed and a short timeout. A command that ends with any
-  code but 0, prints nothing, or does not end in time declares no nouns. A noun spelled `nouns` is the
+- **How `nouns` is asked:** with standard input closed and standard error discarded, every unit command
+  at once, each given two seconds. A command that ends with any code but 0, prints nothing, or does not
+  end in time declares no nouns; one still running at its time is stopped. A noun spelled `nouns` is the
   protocol's own word and is never dispatched.
-- **The answers are cached** under the user's cache directory (`XDG_CACHE_HOME`, else `.cache` in the
-  home directory), each keyed by the unit command's path, size and modification time. A unit command
-  that changes is asked again; one that no longer stands is dropped. A cache that cannot be read or
-  written is passed over, and every unit command is asked afresh.
+- **The answers are cached** in `bmo-cli/nouns.json` under the user's cache directory (`XDG_CACHE_HOME`,
+  else `.cache` in the home directory), each keyed by the unit command's path, size and modification
+  time. A unit command that changes is asked again; one that no longer stands is dropped. A cache that
+  cannot be read or written is passed over, and every unit command is asked afresh.
 
 ## Resolving a command
 
@@ -59,7 +62,7 @@ The words `bmo` is given are read in this order, and the first rule that matches
   git rule it is handed on first, before the remaining words. A `--via` after the first word is a word
   like any other and passes unchanged.
 - **A word starting with `-` before the first word** other than `--via`, `--help`, `-h` and `--version`
-  is refused with 2.
+  is refused with 2 (「What `bmo` answers itself」).
 
 ## What `bmo` answers itself
 
@@ -67,11 +70,13 @@ The words `bmo` is given are read in this order, and the first rule that matches
 |---|---|---|
 | `bmo --version` | `bmo <version>` on standard output | 0 |
 | `bmo help`, `bmo --help`, `bmo -h` | the help, on standard output | 0 |
+| `bmo help <words>` | `<words> --help`, resolved and handed on as any command is | the unit's |
 | `bmo` with no words | the help, on standard error | 2 |
 | words nothing serves | ``bmo: `<words>` is not served yet: no installed unit carries it`` on standard error | 2 |
 | a carried command whose unit command does not stand | ``bmo: `<words>` is not served yet: `bmo-<unit>` is not installed`` on standard error | 2 |
 | a noun two unit commands declare | ``bmo: `<noun>` is declared by both `bmo-<one>` and `bmo-<other>` `` on standard error | 2 |
 | a unit command that cannot be started | ``bmo: `bmo-<unit>` could not be started: <reason>`` on standard error | 1 |
+| an option before the first word that `bmo` does not read | ``bmo: `<option>` is not an option of bmo; options of a command follow its words`` on standard error | 2 |
 
 - **The help** lists the global options, then every noun found, each with the unit command declaring
   it, then every carried command with its unit, then every unit command the git rule reaches.

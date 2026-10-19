@@ -1,4 +1,8 @@
 //! `bmo`, the platform's thin entry point: it finds the unit that carries a command and hands the command
-//! to it.
+//! to it (docs/boundary.md).
 
-fn main() {}
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+  bmo_cli::run(std::env::args_os())
+}
