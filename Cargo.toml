@@ -1,0 +1,14 @@
+# The platform's thin entry point: one package, whose binary `bmo` hands each command to the unit that
+# carries it. Its tests stand in `tests/`.
+[package]
+name = "bmo-cli"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "bmo"
+path = "src/main.rs"
+test = false
+
+[dependencies]

@@ -1,0 +1,24 @@
+# How bmo-testbed tests, checks, builds and deploys this repository, in the testbed's declaration format.
+testbed = 0
+name = "bmo-cli"
+
+[test]
+languages = ["cargo"]
+
+[check]
+quick = ["layout", "dependencies", "korean", "dashes"]
+# The text a person reads: the literals of the binary.
+people_text = ["src/**/*.rs"]
+# No code file holds Korean, so the ledger allows none anywhere.
+korean_ledger = "korean-ledger.json"
+base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-ui"]
+
+[build]
+binaries = ["bmo"]
+
+# The binary goes into a release's bin/ in a deploy tree of its own. It runs no service, so the
+# deployment starts no unit.
+[deploy]
+root = "~/.local/share/bmo-cli"
+data_root = "~/.local/share/bmo-cli/data"
+units = []
