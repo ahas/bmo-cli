@@ -285,26 +285,43 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 
 | Command | Alias | Status |
 |---|---|---|
-| `agent` | `agents` | not served yet |
-| `agent status` | `agent-status` | not served yet |
-| `model` | `models` | not served yet |
-| `coworker pool` | `coworker-pool` | not served yet |
-| `coworker hook` | `coworker-pool-hook` | not served yet |
-| `worker fold` | `fold-worker` | not served yet |
-| `run list` | | not served yet |
-| `run stop` | `stop` | not served yet |
-| `machine memory` | | not served yet |
-| `reload` | | not served yet |
-| `node work` | `work-node` | not served yet |
-| `node claude-token` | `claude-token` | not served yet |
-| `node pane` | `node-pane` | not served yet |
-| `dev-server` | | not served yet |
-| `dev-server list` | `dev-servers` | not served yet |
-| `dev-server pane` | `dev-pane` | not served yet |
-| `companion` | | not served yet |
-| `claude batch` | `claude-batch` | not served yet |
-| `usage` | | not served yet |
-| `fasttrack` | | not served yet |
+| `agent` | `agents` | carried, with its alias: handed to `bmo-agency` under the same words; `--pause-keepalive <worker>` alone is asked of bmo-cache-warmer |
+| `agent status` | `agent-status` | carried, with its alias: handed to `bmo-agency` as `agent-status` |
+| `model` | `models` | carried, with its alias: handed to `bmo-agency` under the same words |
+| `coworker pool` | `coworker-pool` | carried: handed to `bmo-agency` under the same words |
+| `coworker hook` | `coworker-pool-hook` | carried: handed to `bmo-agency` under the same words |
+| `worker fold` | `fold-worker` | carried: handed to `bmo-agency` under the same words |
+| `run list` | | carried: handed to `bmo-agency` under the same words |
+| `run stop` | `stop` | carried: handed to `bmo-agency` under the same words |
+| `machine memory` | | carried: handed to `bmo-agency` under the same words |
+| `reload` | | carried: handed to `bmo-agency` under the same words |
+| `node work` | `work-node` | carried, with its alias: handed to `bmo-agency` under the same words |
+| `node claude-token` | `claude-token` | carried: handed to `bmo-agency` under the same words |
+| `node pane` | `node-pane` | carried, with its alias: handed to `bmo-agency` under the same words |
+| `dev-server` | | carried: handed to `bmo-agency` under the same words, its action and worker after them |
+| `dev-server list` | `dev-servers` | carried, as words of `dev-server` |
+| `dev-server pane` | `dev-pane` | carried, as words of `dev-server`, and its alias under the same words |
+| `companion` | | carried for `companion follow` and `companion reset`; its other forms not served yet, neither the agency's documents nor its command carrying them |
+| `claude batch` | `claude-batch` | carried: handed to `bmo-agency` under the same words |
+| `usage` | | not served yet: neither the agency's documents nor its command carry it |
+| `fasttrack` | | not served yet: neither the agency's documents nor its command carry it |
+
+- **The words** are the ones bmo-agency's documents give its `bmo-agency` command, and where they give none
+  (`coworker hook`, `node pane`, `dev-server`'s actions, `claude batch` and the aliases carried), the ones
+  that command's own words carry. `live-claude`, the second name of `job live-claude`, is carried to
+  `bmo-agency` too, which documents it; `job live-claude` itself reaches bmo-job by its noun.
+- **The road** is not handed on: none of these commands reads it.
+- **Home-bound:** `agent`, `agent status` but for its `shell` kind, `coworker hook`, `node claude-token`,
+  `node work` and `run list` (「The home-bound commands」).
+- **A worker's keepalive paused:** `agent --pause-keepalive <worker>`, those its only words, is
+  `POST /consumers/<consumer>/subjects/<worker>/pause` of the cache warmer, which keeps the switch, each
+  name a percent-encoded path segment; it prints `worker <worker>: keepalive off until its next job`, and a
+  refusal prints the warmer's `error`, ending with 1. Its settings are `[unit.bmo-cache-warmer]` with
+  `address`, `token` where the warmer takes one, and `consumer`, `agency` where none is named.
+- **Asked of bmo-agency:** its command answers `nouns` with these words; carries `run list`, `run stop`,
+  `machine memory` and `companion reset`, which its documents give and its command does not yet; and a
+  word for `usage`, `fasttrack` and a companion's other forms, or a word that they are not its own. Its
+  `agent --pause-keepalive` and the cache warmer's pause route say the same act; one of the two is to go.
 
 ### bmo-pocket (7)
 

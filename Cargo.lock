@@ -81,6 +81,7 @@ dependencies = [
  "axum",
  "clap",
  "inventory",
+ "percent-encoding",
  "serde",
  "serde_json",
  "tempfile",
