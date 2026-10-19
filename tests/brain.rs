@@ -29,7 +29,7 @@ fn a_memory_row_is_filed_as_the_turns_agent_in_its_room() {
   let output = bench.bmo_given(
     &[
       "memory", "--chat", "5", "--add", "--type", "errand", "--action", "-", "--on", "deployed", "--for",
-      "9",
+      "9", "--every", "60", "--within", "30",
     ],
     "stretch",
     &[AGENT],
@@ -46,8 +46,110 @@ fn a_memory_row_is_filed_as_the_turns_agent_in_its_room() {
       "type": "errand",
       "action": "stretch",
       "on": "deployed",
+      "every": 60,
+      "within": 30,
       "for": 9,
     })
+  );
+}
+
+#[test]
+fn a_watch_is_set_as_its_agent_for_the_chat_setting_it() {
+  let stub = Stub::answering(&[("/watches/set", 200, reading(&["watch #4 set"]))]);
+  let bench = reaching(&stub);
+
+  let output = bench.bmo_given(
+    &[
+      "watch",
+      "set",
+      "--chat",
+      "6",
+      "--by",
+      "chat:5",
+      "--until",
+      "test -f done",
+      "--name",
+      "build",
+      "--note",
+      "tell 9",
+      "--every",
+      "60",
+      "--within",
+      "30",
+      "--item",
+      "12",
+    ],
+    "",
+    &[AGENT],
+  );
+
+  assert!(output.status.success(), "{}", errors(&output));
+  assert_eq!(lines(&output), ["watch #4 set"]);
+  assert_eq!(
+    stub.asked()[0].body,
+    json!({
+      "turn": { "agent": "agent-a", "chatId": 5, "messageId": null },
+      "note": "tell 9",
+      "until": "test -f done",
+      "name": "build",
+      "every": 60,
+      "within": 30,
+      "item": 12,
+      "chat": 6,
+    })
+  );
+}
+
+#[test]
+fn a_watch_that_does_not_read_is_refused_with_its_usage() {
+  let stub = Stub::answering(&[(
+    "/watches/set",
+    200,
+    json!({ "answered": false, "refusal": { "code": "usage", "message": "a watch takes --until or --at" } }),
+  )]);
+  let bench = reaching(&stub);
+
+  let unread = bench.bmo_given(&["watch", "set", "--by", "5", "--note", "x"], "", &[AGENT]);
+  let refused = bench.bmo_given(&["watch", "set", "--by", "chat:5", "--note", "x"], "", &[AGENT]);
+  let nobody = bench.bmo(&["watch", "set", "--by", "chat:5", "--note", "x"]);
+
+  assert_eq!(unread.status.code(), Some(1));
+  assert!(
+    errors(&unread).starts_with("watch: --by takes chat:<chatId>, the chat setting it\nusage: bmo watch")
+  );
+  assert!(
+    errors(&refused).starts_with("watch: a watch takes --until or --at\nusage: bmo watch"),
+    "{}",
+    errors(&refused)
+  );
+  assert!(errors(&nobody).starts_with("watch: no agent is named"));
+  assert_eq!(stub.asked().len(), 1);
+}
+
+#[test]
+fn a_chats_watches_are_listed_as_a_session_reads_them_and_one_is_called_off() {
+  let stub = Stub::answering(&[
+    ("/watches/list", 200, json!({ "watches": [], "lines": [] })),
+    ("/watches/cancel", 200, reading(&["cancelled #4"])),
+  ]);
+  let bench = reaching(&stub);
+
+  let listed = bench.bmo(&["watch", "list", "--by", "chat:5", "--all"]);
+  let cancelled = bench.bmo(&["watch", "list", "--cancel", "4", "--by", "chat:5"]);
+  let unread = bench.bmo(&["watch", "list", "--by", "5"]);
+
+  assert_eq!(lines(&listed), ["(no watches)"]);
+  assert_eq!(lines(&cancelled), ["cancelled #4"]);
+  assert_eq!(
+    (unread.status.code(), errors(&unread)),
+    (
+      Some(1),
+      "usage: bmo watch list --by chat:<chatId> [--all] | --cancel <id> --by chat:<chatId>\n".to_owned()
+    )
+  );
+  assert_eq!(
+    stub.asked().into_iter().map(|asked| asked.body).collect::<Vec<_>>(),
+    [json!({ "by": 5, "agent": null, "all": true }), json!({ "id": 4, "by": 5 })]
   );
 }
 

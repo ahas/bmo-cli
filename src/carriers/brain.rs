@@ -271,6 +271,56 @@ struct DigestPeople {
   forget_read: bool,
 }
 
+/// A watch that wakes the agent setting it once a check comes true, or a timer at a moment no check can say.
+#[derive(Parser)]
+#[command(name = "bmo watch set", no_binary_name = true, allow_negative_numbers = true)]
+struct WatchSet {
+  #[arg(long, allow_hyphen_values = true)]
+  chat: Option<String>,
+  /// `chat:<chatId>`, the chat setting it.
+  #[arg(long, allow_hyphen_values = true)]
+  by: Option<String>,
+  /// A short read-only shell check that exits 0 once the thing is so.
+  #[arg(long, allow_hyphen_values = true)]
+  until: Option<String>,
+  /// `YYYY-MM-DD HH:MM` on the deployment's clock, for a timer.
+  #[arg(long, allow_hyphen_values = true)]
+  at: Option<String>,
+  #[arg(long, allow_hyphen_values = true)]
+  name: Option<String>,
+  /// What it waits for and what was promised, to whom.
+  #[arg(long, allow_hyphen_values = true)]
+  note: Option<String>,
+  #[arg(long, allow_hyphen_values = true)]
+  every: Option<String>,
+  #[arg(long, allow_hyphen_values = true)]
+  within: Option<String>,
+  /// The memory it serves.
+  #[arg(long, allow_hyphen_values = true)]
+  item: Option<String>,
+  /// Whose watch it is, where the run calling it names none.
+  #[arg(long)]
+  agent: Option<String>,
+}
+
+/// The watches a chat set: the standing ones, or every one with --all; or one called off with --cancel.
+#[derive(Parser)]
+#[command(name = "bmo watch list", no_binary_name = true)]
+struct WatchList {
+  #[arg(long, allow_hyphen_values = true)]
+  by: String,
+  #[arg(long)]
+  all: bool,
+  #[arg(long)]
+  cancel: Option<i64>,
+}
+
+const WATCH_USAGE: &str = "usage: bmo watch --chat <chatId> --by chat:<chatId> --until '<check>' --name '<short name>' --note '<what and for whom>' [--every <seconds>] [--within <minutes>] [--item <id>]
+       bmo watch --chat <chatId> --by chat:<chatId> --at 'YYYY-MM-DD HH:MM' --name '<short name>' --note '<what and for whom>' [--item <id>]   (a timer: only when no check can say it)
+either form takes --agent <name>, the agent whose watch it is, where the run calling it names none";
+const WATCHES_USAGE: &str =
+  "usage: bmo watch list --by chat:<chatId> [--all] | --cancel <id> --by chat:<chatId>";
+
 /// A room's reminders still to come, or every one with --all; or one called off with --cancel.
 #[derive(Parser)]
 #[command(name = "bmo reminder list", no_binary_name = true, allow_negative_numbers = true)]
@@ -302,6 +352,8 @@ impl Carried for Brain {
       "brain hold",
       "brain wait",
       "reminder list",
+      "watch set",
+      "watch list",
     ]
   }
 
@@ -321,6 +373,8 @@ impl Carried for Brain {
       "digest now" => digest_now(&service, read(call.rest)),
       "brain hold" => brain_hold(&service),
       "reminder list" => reminders(&service, read(call.rest)),
+      "watch set" => watch_set(&service, read(call.rest)),
+      "watch list" => watch_list(&service, read(call.rest)),
       _ => brain_wait(&service),
     }
   }
@@ -520,8 +574,8 @@ fn memory_call(service: &Service, asked: &Memory) -> Result<Vec<String>, String>
           ("on", text(&asked.on)),
           ("until", text(&asked.until)),
           ("name", text(&asked.name)),
-          ("every", text(&asked.every)),
-          ("within", text(&asked.within)),
+          ("every", whole("--every", asked.every.as_deref())?.map(Value::from)),
+          ("within", whole("--within", asked.within.as_deref())?.map(Value::from)),
           ("slug", text(&asked.slug)),
           ("for", whole("--for", asked.for_user.as_deref())?.map(Value::from)),
           ("by", whole("--by", asked.by.as_deref())?.map(Value::from)),
@@ -1073,6 +1127,75 @@ fn brain_wait(service: &Service) -> ExitCode {
     }
     Err(why) => refused(&why),
   }
+}
+
+// The room a `chat:<chatId>` names.
+fn by_chat(given: &str) -> Option<i64> {
+  given.trim().strip_prefix("chat:")?.parse().ok()
+}
+
+fn watch_set(service: &Service, asked: WatchSet) -> ExitCode {
+  let Some(agent) = asked.agent.clone().or_else(turn::agent) else {
+    return refused(
+      "watch: no agent is named: run this inside an agent's turn, or name one with --agent <name>",
+    );
+  };
+  let read = || -> Result<Value, String> {
+    let by = asked
+      .by
+      .as_deref()
+      .and_then(by_chat)
+      .ok_or("--by takes chat:<chatId>, the chat setting it")?;
+    let chat = whole("--chat", asked.chat.as_deref())?;
+    let text = |given: &Option<String>| given.clone().map(Value::from);
+
+    Ok(Value::Object(fields(vec![
+      ("turn", Some(json!({ "agent": agent, "chatId": by, "messageId": null }))),
+      ("note", Some(Value::from(asked.note.clone().unwrap_or_default()))),
+      ("until", text(&asked.until)),
+      ("at", text(&asked.at)),
+      ("name", text(&asked.name)),
+      ("every", whole("--every", asked.every.as_deref())?.map(Value::from)),
+      ("within", whole("--within", asked.within.as_deref())?.map(Value::from)),
+      ("item", whole("--item", asked.item.as_deref())?.map(Value::from)),
+      ("chat", chat.filter(|chat| *chat != by).map(Value::from)),
+    ])))
+  };
+  let body = match read() {
+    Ok(body) => body,
+    Err(why) => return refused(&format!("watch: {why}\n{WATCH_USAGE}")),
+  };
+
+  match service.post("/watches/set", &body) {
+    Ok(said) if said["answered"] == false => {
+      let usage = if said["refusal"]["code"] == "usage" {
+        format!("\n{WATCH_USAGE}")
+      } else {
+        String::new()
+      };
+
+      refused(&format!("watch: {}{usage}", reading(&said).err().unwrap_or_default()))
+    }
+    answered => printed(answered.map(|said| lines_of(&said)).map_err(|why| format!("watch: {why}"))),
+  }
+}
+
+fn watch_list(service: &Service, asked: WatchList) -> ExitCode {
+  let Some(by) = by_chat(&asked.by) else { return refused(WATCHES_USAGE) };
+  let answered = match asked.cancel {
+    Some(id) => service
+      .post("/watches/cancel", &json!({ "id": id, "by": by }))
+      .and_then(|said| reading(&said)),
+    None => service
+      .post("/watches/list", &json!({ "by": by, "agent": null, "all": asked.all }))
+      .map(|said| {
+        let lines = lines_of(&said);
+
+        if lines.is_empty() { vec!["(no watches)".to_owned()] } else { lines }
+      }),
+  };
+
+  printed(answered)
 }
 
 // A room's reminders listed as a session reads them back, every room's agent among them, or one called off.

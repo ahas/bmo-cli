@@ -9,7 +9,7 @@ use support::stub::Stub;
 use support::{Bench, errors, lines};
 
 // The receiver's commands no route serves today.
-const NOT_SERVED: [&str; 19] = [
+const NOT_SERVED: [&str; 17] = [
   "room mute",
   "room notice",
   "room photos",
@@ -22,8 +22,6 @@ const NOT_SERVED: [&str; 19] = [
   "owner tell",
   "archive scan",
   "archive photo-repair",
-  "watch set",
-  "watch list",
   "runner watch",
   "procedure show",
   "draw verify",

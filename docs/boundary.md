@@ -229,7 +229,7 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 - **Asked of bmo-artifact:** its command answers `nouns` with these words and their second names, so they
   reach it without this repository carrying them.
 
-### bmo-receiver (24)
+### bmo-receiver (22)
 
 | Command | Alias | Status |
 |---|---|---|
@@ -253,8 +253,6 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 | `draw` | `random-draw` | carried for `draw draw`: `POST /sends`, the act `random_draw`; `draw verify` not served yet, no route |
 | `archive scan` | `archive-scan` | not served yet: no route |
 | `archive photo-repair` | `photo-repair` | not served yet: no route |
-| `watch set` | `watch` | not served yet: no route |
-| `watch list` | `watches` | not served yet: no route |
 | `runner watch` | `watch-runner` | not served yet: no route |
 | `procedure show` | `procedure` | not served yet: no route |
 
@@ -356,10 +354,12 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 - **Asked of bmo-pocket:** its command, `bmo-pocket`, carries these words and answers `nouns`, and a route,
   or the owning unit's, for the three commands not served.
 
-### bmo-brain (10)
+### bmo-brain (12)
 
 | Command | Alias | Status |
 |---|---|---|
+| `watch set` | `watch` | carried: `POST /watches/set` |
+| `watch list` | `watches` | carried: `POST /watches/list`, and with `--cancel` `POST /watches/cancel` |
 | `reminder list` | `reminders` | carried: `POST /reminders/list`, and with `--cancel` `POST /reminders/cancel` |
 | `memory` | | carried: `POST /memory/add`, `/update`, `/done`, `/retire`, `/revive`, `/candidate` and `/list`, by its verb |
 | `note` | | carried: `POST /notes/add` |
@@ -407,6 +407,16 @@ the git rule reaches it, or the unit documents it as a second name of a command 
   its unit and notes, or a reading; `refused` prints why on standard error, ending with 1.
 - **`brain hold`** prints who holds the brain and which editing locks are taken; **`brain wait`** prints
   the brain's reading and ends with 1 where a lock is still taken.
+- **The watches** are bmo-brain's, the rows and the runs that check them; `runner watch` is not carried,
+  since the brain's own binary runs a watch. `watch set` is `POST /watches/set` as its agent, the `turn`'s
+  room the chat `--by chat:<chatId>` names (refused with the usage where it names none), with `note`,
+  `until`, `at`, `name`, `every` (seconds), `within` (minutes), `item`, and `chat` where `--chat` names
+  another room; it prints the brain's reading, and its refusal as `watch: <message>`, with the usage where
+  the refusal's code is `usage`. `watch list --by chat:<chatId> [--all]` asks `POST /watches/list` with `by`,
+  `agent` null and `all`, printing the `lines` the brain reads the watches back with, `(no watches)` where
+  there are none; `--cancel <id>` asks `POST /watches/cancel` with `id` and `by`.
+- **Numbers the brain's tools take as numbers** (`every`, `within`, `item`, `for`, `by`, `todo`, a room)
+  are sent as numbers, and a word that is not a whole number is refused before anything is asked.
 - **Home-bound:** `brain hold`, `brain wait` and `digest pause` (「The home-bound commands」).
 
 ### bmo-node (2)
