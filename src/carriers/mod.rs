@@ -2,4 +2,5 @@
 //! Each registers itself with `carried`.
 
 mod artifact;
+mod receiver;
 mod testbed;

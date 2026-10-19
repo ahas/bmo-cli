@@ -20,6 +20,13 @@ pub fn not_installed(words: &[OsString], unit: &str) -> ExitCode {
   ExitCode::from(2)
 }
 
+/// A carried command whose unit the settings do not say how to reach.
+pub fn unsettled(words: &[OsString], unit: &str, why: &str) -> ExitCode {
+  eprintln!("bmo: `{}` cannot be asked of {unit}: {why}", spelled(words));
+
+  ExitCode::from(2)
+}
+
 /// A noun two unit commands declare.
 pub fn conflict(noun: &str, one: &Unit, other: &Unit) -> ExitCode {
   eprintln!("bmo: `{noun}` is declared by both `{}` and `{}`", one.name, other.name);

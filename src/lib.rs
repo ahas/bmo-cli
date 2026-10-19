@@ -8,9 +8,12 @@ pub mod carried;
 mod carriers;
 pub mod hand;
 pub mod help;
+pub mod http;
 pub mod line;
 pub mod nouns;
 pub mod resolve;
+pub mod settings;
+pub mod turn;
 pub mod units;
 
 use std::ffi::OsString;

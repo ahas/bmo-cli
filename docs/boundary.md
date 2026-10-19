@@ -86,9 +86,23 @@ The words `bmo` is given are read in this order, and the first rule that matches
 
 - **One TOML file,** named by `BMO_CLI_SETTINGS`, else `settings.toml` in the release `bmo` stands in:
   the parent of the directory holding `bmo`. A file that does not stand is no settings.
-- **`[unit.<name>]`** is one unit's table, read by the module carrying that unit's commands alone;
-  `address` is the base address of the unit's HTTP service. A carried call whose unit has no address is
-  refused with 2, naming the setting it needs.
+- **`[unit.<name>]`** is one unit's table, `<name>` its command's name (`bmo-receiver`), read by the module
+  carrying that unit's commands alone: `address`, the base address of the unit's HTTP service, an
+  `http://` address; `token`, the token it takes as `Authorization: Bearer <token>`; and what else the
+  unit's section below names. A carried call whose unit's table lacks a setting it needs is refused with 2,
+  naming the setting; a file that does not read as TOML is refused the same way, naming the file.
+- **A carried call that reaches no service,** or that the service answers outside 200 to 299 with no
+  sentence of its own, says so on standard error and ends with 1.
+
+## The turn
+
+A carried command that acts as an agent reads the turn it is run in as bmo-agency's tools read it: the
+process's environment, and where `BMO_AGENT_PLACE` names an agent's place, the environment without the
+run's own variables (`BMO_RUN_NAME`, `BMO_TASK_LOCKED`, `BMO_WORK_ORDER_STEP` and every `BMO_TURN_` one)
+overlaid by the variables of the run the place's `run.json` names, none for a person's turn.
+
+- **The agent** is `BMO_TURN_AGENT`.
+- **A job's run** is one where `CLAUDECODE` is set in the process and `BMO_TASK_LOCKED` in the turn.
 
 ## The home bridge
 
@@ -215,35 +229,57 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 - **Asked of bmo-artifact:** its command answers `nouns` with these words and their second names, so they
   reach it without this repository carrying them.
 
-### bmo-receiver (25)
+### bmo-receiver (24)
 
 | Command | Alias | Status |
 |---|---|---|
-| `room say` | `say` | not served yet |
-| `room pin` | `pin` | not served yet |
-| `room react` | `react` | not served yet |
-| `room sticker` | `sticker` | not served yet |
-| `room photo` | `photo` | not served yet |
-| `room photos` | `photos` | not served yet |
-| `room file` | `file` | not served yet |
-| `room upload` | `upload` | not served yet |
-| `room mp3` | `mp3` | not served yet |
-| `room mute` | `mute` | not served yet |
-| `room notice` | `notice` | not served yet |
-| `room rules` | `room-rules` | not served yet |
-| `runner say` | `say-runner` | not served yet |
-| `runner mp3` | `mp3-runner` | not served yet |
-| `owner tell` | `tell-owner` | not served yet |
-| `reminder set` | `remind` | not served yet |
-| `reminder list` | `reminders` | not served yet |
-| `consult` | | not served yet |
-| `draw` | `random-draw` | not served yet |
-| `archive scan` | `archive-scan` | not served yet |
-| `archive photo-repair` | `photo-repair` | not served yet |
-| `watch set` | `watch` | not served yet |
-| `watch list` | `watches` | not served yet |
-| `runner watch` | `watch-runner` | not served yet |
-| `procedure show` | `procedure` | not served yet |
+| `room say` | `say` | carried: `POST /sends`, the act `say` |
+| `room pin` | `pin` | carried: `POST /sends`, the act `pin` |
+| `room react` | `react` | carried: `POST /sends`, the act `react` |
+| `room sticker` | `sticker` | carried: `POST /sends`, the act `sticker`; its `--list` form not served yet, no route listing the set |
+| `room photo` | `photo` | carried: `POST /sends`, the act `photo` |
+| `room photos` | `photos` | not served yet: no route |
+| `room file` | `file` | not served yet: no route |
+| `room upload` | `upload` | not served yet: no route |
+| `room mp3` | `mp3` | not served yet: no route |
+| `room mute` | `mute` | not served yet: no route |
+| `room notice` | `notice` | not served yet: no route |
+| `room rules` | `room-rules` | not served yet: no route |
+| `runner say` | `say-runner` | not served yet: the receiver's own runner of a line, no route |
+| `runner mp3` | `mp3-runner` | not served yet: no route |
+| `owner tell` | `tell-owner` | not served yet: no route |
+| `reminder set` | `remind` | carried: `POST /sends`, the act `remind`, which the receiver carries to bmo-brain |
+| `consult` | | carried for `consult say` (`POST /consult/say`) and `consult state` (`POST /consult/block`); `consult room` not served yet, no route |
+| `draw` | `random-draw` | carried for `draw draw`: `POST /sends`, the act `random_draw`; `draw verify` not served yet, no route |
+| `archive scan` | `archive-scan` | not served yet: no route |
+| `archive photo-repair` | `photo-repair` | not served yet: no route |
+| `watch set` | `watch` | not served yet: no route |
+| `watch list` | `watches` | not served yet: no route |
+| `runner watch` | `watch-runner` | not served yet: no route |
+| `procedure show` | `procedure` | not served yet: no route |
+
+- **What is asked:** each act is one `POST /sends` of the receiver's own family, its body the `asker`, the
+  act's name as `tool` and its fields as `input`:
+  - **the asker** is `chat` (the room), `via` (the road: the command's own `--via`, else the one named
+    before the command), `agent` (the turn's, 「The turn」), `by` (`room say`'s `--by`), and `job`, true
+    for a job's run; a field with nothing to give is left out. A reminder is asked with the room and the
+    agent alone, its agent `--agent` where the turn names none, and refused before anything is asked where
+    neither does.
+  - **the inputs**, by the command's own words: `say` the text and `reply`; `photo` the pictures, each
+    `url` and the `label` given right after it, and `caption`; `react` the message and the emoji; `pin` the
+    message and `unpin`; `sticker` the emoji; `random_draw` the fields of `--spec`, one JSON object, and
+    `mode`, `sync` or `async`; `remind` `at` or `every`, `reason`, `memory` and `user`.
+  - **a consult line** is `POST /consult/say` with `agent`, `text` and `replyTo`, and **a consult block**
+    `POST /consult/block` with `agent`, the agent `--agent` names or the turn's.
+- **What is answered:** the `lines` of the answer, one a line on standard output. A `refusal` beside them,
+  or an `error` with any status outside 200 to 299, is printed on standard error after them and ends the
+  command with 1; a block is printed whole, or a line saying none is shown.
+- **Refused before anything is asked,** ending with 1: a line with no words, a `--reply` with no other
+  chat to answer back to, a room that is neither named nor the owner's (`BMO_OWNER_ID`, else `owner` in
+  the receiver's table), a draw without its room, its mode or its spec, and a consult call no agent makes.
+- **The settings:** `[unit.bmo-receiver]` with `address`, `token` and `owner`.
+- **Asked of bmo-receiver:** its command carries these words and answers `nouns`, so the sends reach it
+  without this repository; and a route, or its command's words, for each command not served.
 
 ### bmo-agency (20)
 
@@ -282,10 +318,11 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 | `tool sites` | `site-tools` | not served yet |
 | `tool unread-pages` | `unread-pages` | not served yet |
 
-### bmo-brain (9)
+### bmo-brain (10)
 
 | Command | Alias | Status |
 |---|---|---|
+| `reminder list` | `reminders` | not served yet |
 | `memory` | | not served yet |
 | `note` | | not served yet |
 | `fragment` | | not served yet |
@@ -295,6 +332,9 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 | `digest now` | `digest-now` | not served yet |
 | `brain hold` | | not served yet |
 | `brain wait` | | not served yet |
+
+- **The reminders a room holds** are bmo-brain's: its `POST /reminders/list` and `POST /reminders/cancel` are
+  what `reminder list` and its `--cancel` call, as the receiver's documents say.
 
 ### bmo-node (2)
 
