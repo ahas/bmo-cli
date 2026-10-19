@@ -6,6 +6,7 @@ use std::ffi::OsString;
 use std::process::ExitCode;
 
 use crate::units::Unit;
+use crate::{answer, hand};
 
 /// A module carrying one unit's commands.
 pub trait Carried: Sync {
@@ -35,6 +36,26 @@ pub struct Call<'a> {
   pub via: Option<&'a str>,
   /// Every unit command found.
   pub units: &'a [Unit],
+}
+
+impl Call<'_> {
+  /// The words as they were asked, the command's own and the rest.
+  pub fn words(&self) -> Vec<OsString> {
+    self.command.split(' ').map(OsString::from).chain(self.rest.iter().cloned()).collect()
+  }
+
+  /// Hands the call to the unit command `unit` as `words` followed by the rest of the call's words; where
+  /// that command does not stand on this machine, the call is not served.
+  pub fn forward(&self, unit: &str, words: &[&str]) -> ExitCode {
+    match self.units.iter().find(|found| found.name == unit) {
+      Some(found) => {
+        let handed = words.iter().map(OsString::from).chain(self.rest.iter().cloned()).collect();
+
+        hand::hand(found, handed)
+      }
+      None => answer::not_installed(&self.words(), unit),
+    }
+  }
 }
 
 /// A registered carrier, as a module submits it.

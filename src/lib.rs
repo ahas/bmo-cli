@@ -5,6 +5,7 @@ pub mod answer;
 pub mod bridge;
 pub mod cache;
 pub mod carried;
+mod carriers;
 pub mod hand;
 pub mod help;
 pub mod line;

@@ -169,30 +169,35 @@ the git rule reaches it.
 
 | Command | Alias | Status |
 |---|---|---|
-| `test suite` | `test-suite` | not served yet |
-| `test count` | `test-count` | not served yet |
-| `test log` | | not served yet |
-| `test template` | | not served yet |
-| `test full` | `full-suite` | not served yet |
-| `check` | | not served yet |
-| `imports` | | not served yet |
-| `cargo` | | not served yet |
-| `edit` | | not served yet |
+| `test suite` | `test-suite` | carried: handed to bmo-testbed as `suite` |
+| `test count` | `test-count` | carried: handed to bmo-testbed as `count` |
+| `test log` | | carried: handed to bmo-testbed as `log` |
+| `test template` | | carried: handed to bmo-testbed as `template` |
+| `test full` | `full-suite` | carried: handed to bmo-testbed as `full` |
+| `check` | | carried: handed to bmo-testbed as `check` |
+| `imports` | | carried: handed to bmo-testbed as `imports` |
+| `cargo` | | carried: handed to bmo-testbed as `cargo`, and `cargo prune` as `prune` |
+| `edit` | | not served yet: bmo-testbed documents no verb for it |
 | `testbed run` | `testbed` | bmo-testbed, by the git rule |
 | `testbed status` | | bmo-testbed, by the git rule |
-| `deploy commit` | `deploy` | not served yet |
-| `deploy tool` | | not served yet |
-| `deploy web` | | not served yet |
+| `deploy commit` | `deploy` | carried: handed to bmo-testbed as `deploy` |
+| `deploy tool` | | not served yet: bmo-testbed documents no verb for it |
+| `deploy web` | | not served yet: bmo-testbed documents no verb for it |
 | `deploy backlog` | `deploy-backlog` | retired |
 | `deploy main` | `suite-deploy` | retired |
-| `deploy backups` | `deploy-backups` | not served yet |
-| `deploy down-alert` | `bot-down` | not served yet |
-| `machine stand-in` | | not served yet |
-| `backup snapshot` | `snapshot-backup` | not served yet |
-| `backup drill` | `restore-drill` | not served yet |
+| `deploy backups` | `deploy-backups` | carried: handed to bmo-testbed as `backups` |
+| `deploy down-alert` | `bot-down` | not served yet: bmo-testbed documents no verb for it |
+| `machine stand-in` | | not served yet: bmo-testbed documents no verb for it |
+| `backup snapshot` | `snapshot-backup` | not served yet: bmo-testbed documents no verb for it |
+| `backup drill` | `restore-drill` | not served yet: bmo-testbed documents no verb for it |
 
 - **Retired:** the platform deploys each repository on its own through bmo-testbed, so no command
   deploys several repositories at once. `deploy backlog` and `deploy main` answer as not served.
+- **Handed on:** the rest of a carried command's words follow the verb unchanged. These commands never
+  read the caller's road, so a `--via` given before them is not handed on.
+- **Asked of bmo-testbed:** a verb for each command its boundary has none for, or a word that it is
+  not the testbed's; and the platform's words (`test suite` and the rest) declared as its nouns, so its
+  commands reach it without this repository carrying them.
 
 ### bmo-artifact (8)
 
