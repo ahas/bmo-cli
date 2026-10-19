@@ -133,8 +133,8 @@ a module of this repository by marking the commands it carries.
 
 These are the platform's shell commands, 136 of them, each under the unit that owns it. A status says
 what `bmo` does with the command today; each command's alias is listed under the same unit, for that
-unit to carry. `bmo` holds no alias table: an alias is served only where a unit declares it as a noun or
-the git rule reaches it.
+unit to carry. `bmo` holds no alias table: an alias is served only where a unit declares it as a noun,
+the git rule reaches it, or the unit documents it as a second name of a command a module here carries.
 
 - **Not served yet** means no unit command or route serves the words today; the unit named above the
   table is the one to carry them.
@@ -199,18 +199,21 @@ the git rule reaches it.
   not the testbed's; and the platform's words (`test suite` and the rest) declared as its nouns, so its
   commands reach it without this repository carrying them.
 
-### bmo-artifact (8)
+### bmo-artifact (6)
 
 | Command | Alias | Status |
 |---|---|---|
-| `archive doc` | `archive-doc` | not served yet |
-| `archive share` | `archive-share` | not served yet |
-| `archive html-read` | | not served yet |
-| `search` | | not served yet |
-| `search branch` | `research-branch` | not served yet |
-| `runner search` | `search-runner` | not served yet |
-| `news-brief` | | not served yet |
-| `runner news-brief` | `news-brief-runner` | not served yet |
+| `archive doc` | `archive-doc` | carried, with its alias: handed to `bmo-artifact-cli` under the same words |
+| `archive share` | `archive-share` | carried, with its alias: handed to `bmo-artifact-cli` under the same words |
+| `archive html-read` | | carried: handed to `bmo-artifact-cli` under the same words |
+| `search` | | carried: handed to `bmo-artifact-cli` under the same words, with the road |
+| `search branch` | `research-branch` | carried, with its alias: handed to `bmo-artifact-cli` under the same words |
+| `runner search` | `search-runner` | carried, with its alias: handed to `bmo-artifact-cli` under the same words, with the road |
+
+- **The road** is handed on only to `search` and `runner search`, the two whose words read it; it follows
+  their command's words.
+- **Asked of bmo-artifact:** its command answers `nouns` with these words and their second names, so they
+  reach it without this repository carrying them.
 
 ### bmo-receiver (25)
 
@@ -330,13 +333,18 @@ the git rule reaches it.
 | `remote-browser` | | not served yet |
 | `runner remote-browser` | `remote-browser-runner` | not served yet |
 
-### bmo-voice (3)
+### bmo-voice (5)
 
 | Command | Alias | Status |
 |---|---|---|
 | `voice say` | `voice` | not served yet |
 | `voice brief` | `voice-brief` | not served yet |
 | `runner voice` | `voice-runner` | not served yet |
+| `news-brief` | | not served yet |
+| `runner news-brief` | `news-brief-runner` | not served yet |
+
+- **The news brief** is bmo-voice's: bmo-artifact's own inventory gives its runner and its store to
+  bmo-voice.
 
 ### bmo-song (3)
 

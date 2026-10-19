@@ -45,16 +45,31 @@ impl Call<'_> {
   }
 
   /// Hands the call to the unit command `unit` as `words` followed by the rest of the call's words; where
-  /// that command does not stand on this machine, the call is not served.
+  /// that command does not stand on this machine, the call is not served. The caller's road is left out.
   pub fn forward(&self, unit: &str, words: &[&str]) -> ExitCode {
-    match self.units.iter().find(|found| found.name == unit) {
-      Some(found) => {
-        let handed = words.iter().map(OsString::from).chain(self.rest.iter().cloned()).collect();
+    self.hand_to(unit, words, None)
+  }
 
-        hand::hand(found, handed)
-      }
-      None => answer::not_installed(&self.words(), unit),
-    }
+  /// Hands the call as `forward` does, with the caller's road after `words` where it named one, for a
+  /// command that reads it.
+  pub fn forward_with_road(&self, unit: &str, words: &[&str]) -> ExitCode {
+    self.hand_to(unit, words, self.via)
+  }
+
+  fn hand_to(&self, unit: &str, words: &[&str], via: Option<&str>) -> ExitCode {
+    let Some(found) = self.units.iter().find(|found| found.name == unit) else {
+      return answer::not_installed(&self.words(), unit);
+    };
+    let road = via.into_iter().flat_map(|road| ["--via", road]);
+    let handed = words
+      .iter()
+      .copied()
+      .chain(road)
+      .map(OsString::from)
+      .chain(self.rest.iter().cloned())
+      .collect();
+
+    hand::hand(found, handed)
   }
 }
 
