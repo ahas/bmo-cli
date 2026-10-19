@@ -11,6 +11,7 @@ the way git finds `git-<command>`. A unit added later needs no new build of `bmo
 | `src/` | The library that reads the words, finds the unit commands and their nouns, resolves a command and hands it on, the modules carrying a unit's commands, and the binary `bmo` |
 | `tests/` | The contract's tests, each running the built `bmo` against stand-in unit commands in a directory of its own |
 | `docs/` | The canonical statements of what `bmo` does |
+| `graph/` | The code dependency graph: one node per feature, where a change starts reading |
 
 At the root stand the Cargo manifest, the version, `testbed.toml` (bmo-testbed's declaration of how this
 repository is tested, checked, built and deployed), the Korean ledger the testbed's `korean` check reads,
