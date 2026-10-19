@@ -16,6 +16,7 @@ use serde_json::Value;
 pub struct Asked {
   pub method: String,
   pub path: String,
+  pub query: Option<String>,
   pub authorization: Option<String>,
   pub body: Value,
 }
@@ -68,6 +69,7 @@ impl Stub {
         kept.lock().unwrap().push(Asked {
           method: method.to_string(),
           path: uri.path().to_owned(),
+          query: uri.query().map(str::to_owned),
           authorization: headers
             .get("authorization")
             .and_then(|value| value.to_str().ok())

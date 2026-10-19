@@ -361,18 +361,50 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 | Command | Alias | Status |
 |---|---|---|
 | `reminder list` | `reminders` | not served yet |
-| `memory` | | not served yet |
-| `note` | | not served yet |
-| `fragment` | | not served yet |
-| `digest run` | `digest` | not served yet |
-| `digest pause` | | not served yet |
-| `digest people` | `people-digest` | not served yet |
-| `digest now` | `digest-now` | not served yet |
-| `brain hold` | | not served yet |
-| `brain wait` | | not served yet |
+| `memory` | | carried: `POST /memory/add`, `/update`, `/done`, `/retire`, `/revive`, `/candidate` and `/list`, by its verb |
+| `note` | | carried: `POST /notes/add` |
+| `fragment` | | carried: `GET /fragments` to list, `POST /fragments/check`, `/sync`, `/write` and `/remove` |
+| `digest run` | `digest` | carried: `POST /digest/run` |
+| `digest pause` | | carried: `POST /digest/pause` |
+| `digest people` | `people-digest` | carried: `POST /digest/people` |
+| `digest now` | `digest-now` | carried: `POST /digest/now` |
+| `brain hold` | | carried: `GET /brain/hold` |
+| `brain wait` | | carried: `POST /brain/wait` |
 
 - **The reminders a room holds** are bmo-brain's: its `POST /reminders/list` and `POST /reminders/cancel` are
   what `reminder list` and its `--cancel` call, as the receiver's documents say.
+- **The settings:** `[unit.bmo-brain]` with `address` and `token`. Every call takes the brain's token; the
+  wait for its editing locks is given ten minutes, every other call one.
+- **The agent** a call is for is its `--agent`, else the turn's (「The turn」); `memory`, `note` and
+  `digest now` are refused with 1 before anything is asked where neither names one. `digest people` names
+  its agent only where `--agent` does, the brain taking the chat agent otherwise.
+- **`memory`** takes one verb a call, `--chat <chatId>` or `--global`, and the flags its verb reads; a flag
+  another verb reads, two verbs, no verb, two scopes or none, a number that is not whole, an `--update` or a
+  `--done` of a global row are refused with the usage, ending with 1. Its body is `turn` (`agent`, `chatId`
+  the room or null for a global row, `messageId` the `--message`) and the verb's arguments: `--type` as
+  `type`, `--for` as `for`, a row named by its number or its slug as `memory`, `--action -` read from
+  standard input, `global` true for a global row. It prints the reading's `lines`; a refusal the brain
+  answers (`answered` false) is printed as `memory: <message>` with the usage, ending with 1.
+- **`note --chat <chatId>`** is `POST /notes/add` with `turn`, the text (`--text`, else standard input),
+  `author` and `global`.
+- **`fragment`** takes one of `--list` (the default), `--check`, `--sync`, `--write` and `--remove`:
+  - **a listing** asks `GET /fragments` with the query `kind`, `chat`, `person`, `item`, `text` (the
+    `--word`) and `down` (`true` for `--all`), and prints a row a line: ` ` for a row that is up or `-`
+    for one down, its kind, its room, person or `every room`, its slug and scope, its title and path, its
+    keywords, items, days written and confirmed and status, its hits and last hit in UTC, and when it was set
+    by hand; no rows prints what was asked for.
+  - **a check** prints each drift, each title the shape check refuses and the counts by kind.
+  - **a write** sends `path`, `title`, `keywords` (the `--keywords` split at commas), `items`, `shared`,
+    `chatId` and `forEveryAgent`; a refusal adds its reasons.
+- **The digests:** `digest run [--chat]` is `POST /digest/run` with `chatId`; `digest now --chat` is
+  `POST /digest/now` with `agent` and `chatId`; `digest people` is `POST /digest/people` with each flag
+  given as its field (`--forget-read` as `forgetRead`, a bare `--since` as `since` null, asking the day);
+  `digest pause [<what>]` is `POST /digest/pause` with `set`, `status` where none is given, printing the
+  reading. An outcome prints as a line: paused, resting, nothing waiting, already running, launched with
+  its unit and notes, or a reading; `refused` prints why on standard error, ending with 1.
+- **`brain hold`** prints who holds the brain and which editing locks are taken; **`brain wait`** prints
+  the brain's reading and ends with 1 where a lock is still taken.
+- **Home-bound:** `brain hold`, `brain wait` and `digest pause` (「The home-bound commands」).
 
 ### bmo-node (2)
 

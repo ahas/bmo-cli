@@ -3,6 +3,7 @@
 
 mod agency;
 mod artifact;
+mod brain;
 mod pocket;
 mod receiver;
 mod testbed;
