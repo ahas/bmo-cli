@@ -92,10 +92,42 @@ The words `bmo` is given are read in this order, and the first rule that matches
 
 ## The home bridge
 
-- **On a work node**, `BMO_HOME_BRIDGE` names the socket of the bridge to the operations machine, and
-  `BMO_HOME_BRIDGE_WAIT_MS` how long a bridge that does not answer is tried before the run is refused.
-- **A command whose noun carries the `home` mark** is handed to the bridge with its words, and the
-  answer the bridge relays is `bmo`'s, its exit code included.
+Some commands read or write what only the operations machine holds. Run on a work node, such a command
+is handed whole to the operations machine, and what comes back is the run's own.
+
+- **When:** `BMO_HOME_BRIDGE` names the bridge's socket, a non-empty path, and the command resolves to a
+  declared noun carrying the `home` mark, or to a carried command its module marks as home-bound. Any
+  other command, or any command where no bridge is named, runs where it was asked.
+- **Reaching the bridge:** the socket is tried until it answers, again every second or every
+  `BMO_HOME_BRIDGE_WAIT_MS` where that is shorter, for at most `BMO_HOME_BRIDGE_WAIT_MS` milliseconds,
+  15 seconds where it names no positive number. Out of reach, `bmo` says on standard error that the
+  operations machine is out of reach from the node `BMO_NODE` names and that the command was not run, and
+  ends with 2.
+- **The request:** one line of JSON: `script`, the binary as the bridge names it under the deploy tree,
+  `bin/bmo`; `args`, every word `bmo` was given, its own options included, in their order; `env`, every
+  variable of the run whose name starts with `BMO_` or `CLAUDE`; and `cwd`, the directory it was asked
+  from.
+- **Frames:** after the request both ways speak in frames: one byte naming the channel, the length of the
+  body as four bytes, most significant first, then the body.
+- **Standing input** goes to the bridge as frames on channel 1, read as it comes, and an empty frame on
+  channel 0 says it ended. The socket stays open both ways.
+- **The answer** comes as frames: channel 1 is written to standard output, channel 2 to standard error,
+  and channel 3 ends the answer with the exit code as a signed four-byte number, most significant first,
+  which `bmo` ends with; a code outside 0 to 255 ends it with 1. Frames on any other channel are passed
+  over. A bridge that drops the connection before channel 3 is answered on standard error, and `bmo` ends
+  with 2.
+
+### The home-bound commands
+
+These 16 commands run at home. Each unit marks its own: a unit command by the `home` mark on the noun,
+a module of this repository by marking the commands it carries.
+
+| Unit | Commands |
+|---|---|
+| bmo-job | `job ask`, `job guard`, `job live-claude`, `job start`, `node land`, `todo` |
+| bmo-agency | `agent`, `agent status` (except where its kind is the shell's), `coworker hook`, `node claude-token`, `node work`, `run list` |
+| bmo-brain | `brain hold`, `brain wait`, `digest pause` |
+| bmo-node | `node list` |
 
 ## Where every command stands
 
@@ -352,3 +384,8 @@ the git rule reaches it.
   bmo-job is asked to declare `job-guard`, and bmo-agency `coworker-pool-hook`, before the hooks run on
   this `bmo`.
 - **Every unit asked to carry commands** declares its nouns: bmo-job alone answers `nouns` today.
+- **The home-bound commands are marked by their units** (「The home-bound commands」); no noun carries the
+  `home` mark today. A mark covers every command under its noun, so where only some of a noun's commands
+  run at home the unit declares those as nouns of their own, marked: bmo-job declares `job ask`,
+  `job guard`, `job live-claude` and `job start` marked `home` beside its unmarked `job`, the longer noun
+  winning, and marks `todo` and `node-land`.

@@ -2,6 +2,7 @@
 //! they declare, a command resolved, and what is handed on or answered.
 
 pub mod answer;
+pub mod bridge;
 pub mod cache;
 pub mod carried;
 pub mod hand;
@@ -22,7 +23,8 @@ use crate::resolve::Resolution;
 
 /// Reads the command line `bmo` was given and hands the command to whoever carries it, or answers it.
 pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
-  let line = match Line::try_parse_from(arguments) {
+  let arguments: Vec<OsString> = arguments.into_iter().collect();
+  let line = match Line::try_parse_from(&arguments) {
     Ok(line) => line,
     Err(why) => why.exit(),
   };
@@ -68,19 +70,25 @@ pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
   }
 
   let via = line.via.as_deref();
+  // A home-bound command asked on a work node is handed to the operations machine with every word given.
+  let given = arguments.get(1..).unwrap_or_default();
+  let home =
+    |bound: bool| bound.then(bridge::socket).flatten().map(|socket| bridge::run_home(&socket, given));
 
   match resolve::resolve(&words, &declared) {
-    Resolution::Noun { unit, noun } => hand::hand(unit, hand::with_via(&words, noun.words.len(), via)),
+    Resolution::Noun { unit, noun } => home(noun.marked("home"))
+      .unwrap_or_else(|| hand::hand(unit, hand::with_via(&words, noun.words.len(), via))),
     Resolution::Conflict { noun, one, other } => answer::conflict(&noun, one, other),
     Resolution::Carried { carrier, command } => {
       let rest = &words[command.split(' ').count()..];
-
-      carrier.run(&Call {
+      let call = Call {
         command,
         rest,
         via,
         units: &declared.units,
-      })
+      };
+
+      home(carrier.home(&call)).unwrap_or_else(|| carrier.run(&call))
     }
     Resolution::Git { unit } => hand::hand(unit, hand::with_via(&words[1..], 0, via)),
     Resolution::NotServed => answer::not_served(&words),

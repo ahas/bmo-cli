@@ -17,6 +17,12 @@ pub trait Carried: Sync {
 
   /// Runs `call.command`, one of its commands, and answers with the exit code `bmo` ends with.
   fn run(&self, call: &Call<'_>) -> ExitCode;
+
+  /// Whether `call` runs on the operations machine, handed over the home bridge on a work node
+  /// (docs/boundary.md, 「The home bridge」); none of a module's commands does unless it says so.
+  fn home(&self, _call: &Call<'_>) -> bool {
+    false
+  }
 }
 
 /// One carried command as it was asked.
