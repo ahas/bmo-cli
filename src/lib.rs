@@ -15,6 +15,7 @@ pub mod resolve;
 pub mod settings;
 pub mod turn;
 pub mod units;
+pub mod unix_http;
 
 use std::ffi::OsString;
 use std::process::ExitCode;

@@ -327,13 +327,34 @@ the git rule reaches it, or the unit documents it as a second name of a command 
 
 | Command | Alias | Status |
 |---|---|---|
-| `tool list` | | not served yet |
-| `tool describe` | | not served yet |
-| `tool call` | | not served yet |
-| `tool probe` | `tool-probe` | not served yet |
-| `tool traffic` | `tool-traffic` | not served yet |
-| `tool sites` | `site-tools` | not served yet |
-| `tool unread-pages` | `unread-pages` | not served yet |
+| `tool list` | | carried: `GET /catalogue` on the control socket |
+| `tool describe` | | carried: `GET /catalogue/<namespace>/<name>` on the control socket |
+| `tool call` | | carried: `GET /catalogue/<namespace>/<name>`, then `POST /calls` on the control socket |
+| `tool probe` | `tool-probe` | not served yet: it runs sessions of its own, which no route of the host's serves |
+| `tool traffic` | `tool-traffic` | not served yet: it counts out of the agent log, which no route serves |
+| `tool sites` | `site-tools` | carried: `GET /facts/web` on the control socket |
+| `tool unread-pages` | `unread-pages` | not served yet: it reads the research runs' failures, which no route serves |
+
+- **The control socket** is HTTP/1.1 over the Unix socket `BMO_MCP_HOST_SOCKET` names, else
+  `bmo/mcp-host.sock` under the user's runtime directory (`XDG_RUNTIME_DIR`, else `/run/user/<uid>`); only
+  the host's own user reaches it, so it takes no token and the cli's settings name nothing for it. A socket
+  that does not answer is said on standard error, naming it, and ends the command with 1.
+- **`tool list [<word>…]`** prints a line an entry, `<name> · <reached> · <where>: <first sentence>`, where
+  `<reached>` is `system` for an entry for the system alone, else its `reachedBy`, and `<where>` is
+  `tools/<placed>` or `linked`; the words keep the entries whose name or description holds every one,
+  case aside.
+- **`tool describe <namespace>/<name>`** prints the entry's `described`, its capabilities, its grant or
+  `none`, and its line; an entry the host serves none of is refused with 1.
+- **`tool call <namespace>/<name> [<arguments>]`** calls it under a record of the shell's: line `shell`,
+  the entry's own capabilities, the data root `BMO_DATA_DIR` names (else `.local/share/bmo/data` in the
+  home directory), the archive `BMO_ARCHIVE_URL` names where it does, and `BMO_TURN_PRIVILEGED` set, since
+  only the host's own user calls. The arguments are one JSON object, `{}` where none is given. It prints
+  each text piece of the result a line, and ends with 1 where the result is an error.
+- **`tool sites [--detail]`** prints the site tools the web namespace's facts list under `sites`: how many,
+  then a paragraph each, its name and what it fetches, its site, since when, its arguments, the forms it
+  answers and with `--detail` its description; a host keeping none is refused with 1.
+- **Asked of bmo-pocket:** its command, `bmo-pocket`, carries these words and answers `nouns`, and a route,
+  or the owning unit's, for the three commands not served.
 
 ### bmo-brain (10)
 

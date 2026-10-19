@@ -3,5 +3,6 @@
 
 mod agency;
 mod artifact;
+mod pocket;
 mod receiver;
 mod testbed;
