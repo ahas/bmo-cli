@@ -1,0 +1,6 @@
+repository = "bmo-cli"
+base = false
+
+[coverage]
+# The package's src/, where the whole entry point's code stands. The tests are outside the index.
+layout = "bmo-next"

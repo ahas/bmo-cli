@@ -2,17 +2,25 @@
   {
     "id": "api/cli",
     "title": "Command API",
-    "what": "The command API bmo exposes to every caller: finding the unit command that carries a word sequence, the nouns protocol, the hand-over and its exit codes, as docs/api.md fixes them.",
+    "what": "The command-line contract bmo offers every unit and caller: the bmo-<name> command it finds, the nouns protocol, the resolution order, the hand-over and its exit codes, its own answers, and the home bridge, as docs/api.md fixes them.",
     "files": [
-      "docs/api.md"
+      "docs/api.md",
+      "docs/boundary.md"
     ],
     "symbols": [],
     "aliases": [],
     "needs": [
-      "entry/dispatch"
+      "entry/dispatch",
+      "entry/words",
+      "entry/unit-commands",
+      "entry/nouns",
+      "entry/resolution",
+      "entry/hand",
+      "entry/answers",
+      "entry/home-bridge"
     ],
-    "base": "7738682f852f57bddaaa04a5b42a36b78f9a6b7c",
-    "changed": 1792486515841,
+    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
+    "changed": 1792497971708,
     "boundary": {
       "side": "exposes"
     }
