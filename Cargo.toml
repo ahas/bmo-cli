@@ -23,4 +23,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.138"
 
 [dev-dependencies]
+# The personal-data check reads each tracked file for a mail address, a home path, a telephone number, a
+# token and a private network address.
+regex = "1.13.1"
 tempfile = "3.20.0"

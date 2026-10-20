@@ -31,6 +31,7 @@ These rules hold every change to this repository.
   and branch names. No Korean in code or tests; the testbed's `korean` check holds this.
 - What `bmo` answers is an English sentence for a person and an exit code for a machine.
 - No personal data: no user names, home directories, machine names or names of any agent.
+  `docs/PERSONAL-DATA.md` states the rule whole, and the repository's test reads every tracked file for it.
 
 ## Layout
 
