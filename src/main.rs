@@ -1,5 +1,5 @@
 //! `bmo`, the platform's thin entry point: it finds the unit that carries a command and hands the command
-//! to it (docs/boundary.md).
+//! to it (docs/api.md).
 
 use std::process::ExitCode;
 

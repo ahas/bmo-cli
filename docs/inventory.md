@@ -3,8 +3,9 @@
 The platform's shell command used to be one binary of the single repository, which read every command
 itself and ran it in its own process. This repository takes from it only what a thin entry point is:
 reading the words, finding who carries them, and handing them on. Every command's own work stays with
-the unit that owns it (docs/boundary.md, 「Where every command stands」). This is the one document that
-names the single repository's files, since accounting for them is what it is for.
+the unit that owns it, whose own document names the words its command carries (docs/api.md, 「The nouns a
+unit declares」). This is the one document that names the single repository's files, since accounting for
+them is what it is for.
 
 ## How the sets were read
 
@@ -23,10 +24,10 @@ names the single repository's files, since accounting for them is what it is for
 
 | File | Lines | What is taken | Where it stands here |
 |---|---|---|---|
-| `bot/bmo-server/src/bin/bmo.rs` | 2058 | The entry's shape: the global `--via` option and its meaning, the help and the version, and clap's exit code 2 for words it does not read. Its commands, its startup reading of the bot's environment file and its per-command code stay with their owners | the binary's reading of the words and its own answers (docs/boundary.md, 「Resolving a command」, 「What `bmo` answers itself」) |
+| `bot/bmo-server/src/bin/bmo.rs` | 2058 | The entry's shape: the global `--via` option and its meaning, the help and the version, and clap's exit code 2 for words it does not read. Its commands, its startup reading of the bot's environment file and its per-command code stay with their owners | the binary's reading of the words and its own answers (docs/api.md, 「Resolving a command」, 「What `bmo` answers itself」) |
 | `bot/bmo-server/src/bin/bmo/tests.rs` | 94 | Of its three cases, the one that the help lists the nouns and no command of two words. The other two, a flat name read as its command and a noun given alone read as the command it was the alias of, are the aliases' cases, which their units carry | the help's test in `tests/` |
-| `bot/bmo-server/src/verbs/nouns.rs` and its `nouns/tests.rs` | 128 and 104 | How the words are read: a noun of two words, the flags before the first word passed over, and the global `--via`'s value passed over with it. The clap tree it builds out of the declared commands is not taken: here the units declare their nouns | the matching of declared nouns (docs/boundary.md, 「Unit commands」) |
-| `bot/bmo-server/src/verbs/home_bridge.rs` | 141 | The client half: the bridge named by `BMO_HOME_BRIDGE`, the wait `BMO_HOME_BRIDGE_WAIT_MS` names (15 seconds where none is named), the framed exchange over the socket and the relayed exit code. Which commands run at home is each unit's, declared by the `home` mark | docs/boundary.md, 「The home bridge」 |
+| `bot/bmo-server/src/verbs/nouns.rs` and its `nouns/tests.rs` | 128 and 104 | How the words are read: a noun of two words, the flags before the first word passed over, and the global `--via`'s value passed over with it. The clap tree it builds out of the declared commands is not taken: here the units declare their nouns | the matching of declared nouns (docs/api.md, 「The unit command」) |
+| `bot/bmo-server/src/verbs/home_bridge.rs` | 141 | The client half: the bridge named by `BMO_HOME_BRIDGE`, the wait `BMO_HOME_BRIDGE_WAIT_MS` names (15 seconds where none is named), the framed exchange over the socket and the relayed exit code. Which commands run at home is each unit's, declared by the `home` mark | docs/api.md, 「The home bridge」 |
 
 - **Personal data and agent names** in what is taken: none. The one agent name in the entry file stands
   on a command that is not taken.

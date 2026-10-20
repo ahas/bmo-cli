@@ -1,5 +1,5 @@
-//! The dispatch contract (docs/boundary.md): unit commands found, their nouns read and kept, a command
-//! resolved and handed on, and what `bmo` answers itself.
+//! The dispatch contract (docs/api.md): unit commands found, their nouns read and kept, a command resolved
+//! and handed on, and what `bmo` answers itself.
 
 mod support;
 
@@ -29,32 +29,27 @@ const JOB_COMMANDS: [&str; 18] = [
   "room jobs",
 ];
 
-// The commands no unit command and no module of this repository carries today.
-const NOT_SERVED: [&str; 24] = [
+// Commands no installed unit declares and no first word names a unit command for.
+const NOT_SERVED: [&str; 19] = [
   "gate eval",
-  "gate bench",
-  "gate laya-agreement",
-  "gate format-cases",
-  "reference compare",
-  "reference inputs",
-  "reference narrowing",
-  "reference replay",
-  "reference roads",
-  "reference waste",
   "browse",
-  "runner browse",
-  "remote-browser",
-  "runner remote-browser",
   "voice say",
-  "voice brief",
-  "runner voice",
   "song",
-  "song gasazip",
-  "runner song",
-  "graph",
   "file share",
-  "node remote-desktop",
   "query",
+  "graph",
+  "room say",
+  "memory",
+  "note",
+  "watch set",
+  "digest run",
+  "test suite",
+  "check",
+  "cargo",
+  "deploy commit",
+  "archive doc",
+  "tool list",
+  "agent",
 ];
 
 fn split(command: &str) -> Vec<&str> {
@@ -92,7 +87,7 @@ fn the_old_words_of_node_land_are_not_bmo_jobs_noun() {
 }
 
 #[test]
-fn every_command_without_a_carrier_is_not_served() {
+fn every_command_no_unit_declares_is_not_served() {
   let bench = Bench::new();
   bench.unit("bmo-job", &JOB_NOUNS);
 
@@ -150,6 +145,18 @@ fn the_git_rule_hands_the_words_after_the_first_to_the_command_it_names() {
 }
 
 #[test]
+fn the_graph_reaches_bmo_graph_by_the_git_rule() {
+  let bench = Bench::new();
+  bench.command(
+    "bmo-graph",
+    "if [ \"$1\" = nouns ]; then exit 2; fi\necho bmo-graph\nfor word in \"$@\"; do echo \"$word\"; done",
+  );
+
+  assert_eq!(lines(&bench.bmo(&["graph", "nodes", "api"])), ["bmo-graph", "nodes", "api"]);
+  assert_eq!(lines(&bench.bmo(&["graph"])), ["bmo-graph"]);
+}
+
+#[test]
 fn a_road_named_before_the_command_follows_the_noun_words() {
   let bench = Bench::new();
   bench.unit("bmo-job", &JOB_NOUNS);
@@ -186,7 +193,7 @@ fn the_exit_code_the_environment_and_the_input_are_the_callers() {
 }
 
 #[test]
-fn the_help_lists_every_noun_carrier_and_unit_command() {
+fn the_help_lists_every_noun_and_unit_command() {
   let bench = Bench::new();
   bench.unit("bmo-job", &JOB_NOUNS);
   bench.unit("bmo-pocket", &[]);
@@ -208,6 +215,7 @@ fn the_help_lists_every_noun_carrier_and_unit_command() {
     }
 
     assert!(help.lines().any(|line| line.trim() == "pocket  bmo-pocket"), "{help}");
+    assert!(!help.contains("Carried:"), "{help}");
     assert!(!help.lines().any(|line| line.trim_start().starts_with("nouns ")), "{help}");
   }
 }
@@ -224,7 +232,7 @@ fn no_words_print_the_help_as_a_refusal() {
 }
 
 #[test]
-fn help_with_words_asks_the_carrier_for_its_own_help() {
+fn help_with_words_asks_the_unit_command_for_its_own_help() {
   let bench = Bench::new();
   bench.unit("bmo-job", &JOB_NOUNS);
 

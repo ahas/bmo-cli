@@ -1,0 +1,20 @@
+[
+  {
+    "id": "api/cli",
+    "title": "Command API",
+    "what": "The command API bmo exposes to every caller: finding the unit command that carries a word sequence, the nouns protocol, the hand-over and its exit codes, as docs/api.md fixes them.",
+    "files": [
+      "docs/api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "entry/dispatch"
+    ],
+    "base": "7738682f852f57bddaaa04a5b42a36b78f9a6b7c",
+    "changed": 1792486515841,
+    "boundary": {
+      "side": "exposes"
+    }
+  }
+]

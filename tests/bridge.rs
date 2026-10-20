@@ -1,4 +1,4 @@
-//! The home bridge (docs/boundary.md, 「The home bridge」): a home-bound command asked on a work node is
+//! The home bridge (docs/api.md, 「The home bridge」): a home-bound command asked on a work node is
 //! handed whole to a stand-in bridge on a socket of the bench's, and its answer is the run's.
 
 mod support;

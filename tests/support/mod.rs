@@ -3,8 +3,6 @@
 
 #![allow(dead_code)]
 
-pub mod stub;
-
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
@@ -93,14 +91,6 @@ impl Bench {
     run(command, Some(input))
   }
 
-  /// A settings file for `bmo` in the bench, holding `text`; `bmo_given` names it with `BMO_CLI_SETTINGS`.
-  pub fn settings(&self, text: &str) -> PathBuf {
-    let path = self.root.path().join("settings.toml");
-
-    std::fs::write(&path, text).unwrap();
-    path
-  }
-
   /// The `bmo` this package built, run with the bench's environment alone.
   pub fn bmo_command(&self, words: &[&str]) -> Command {
     self.bmo_at(Path::new(env!("CARGO_BIN_EXE_bmo")), words)
@@ -115,8 +105,7 @@ impl Bench {
       .env_clear()
       .env("PATH", format!("{}:/usr/bin:/bin", self.bin().display()))
       .env("XDG_CACHE_HOME", self.root.path().join("cache"))
-      .env("HOME", self.root.path().join("home"))
-      .env("BMO_CLI_SETTINGS", self.root.path().join("settings.toml"));
+      .env("HOME", self.root.path().join("home"));
     command
   }
 }

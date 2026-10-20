@@ -4,7 +4,7 @@ use std::ffi::OsString;
 
 use clap::Parser;
 
-/// The words `bmo` is given, its own options taken out (docs/boundary.md, 「Resolving a command」).
+/// The words `bmo` is given, its own options taken out (docs/api.md, 「Resolving a command」).
 #[derive(Parser, Debug)]
 #[command(
   name = "bmo",

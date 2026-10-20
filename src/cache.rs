@@ -1,5 +1,5 @@
 //! The nouns every unit command declares, kept between runs so a command is asked only when it has changed
-//! (docs/boundary.md, 「Unit commands」).
+//! (docs/api.md, 「The unit command」).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -33,12 +33,13 @@ impl Declared {
   }
 }
 
-// One unit command's answer as kept: the file it was read from, by its size and modification time.
+// One unit command's answer as kept: the file it was read from, by its size and modification time, the
+// time in epoch milliseconds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Kept {
   size: u64,
-  modified_seconds: u64,
-  modified_nanos: u32,
+  modified_ms: u64,
   nouns: Vec<Noun>,
 }
 
@@ -57,14 +58,14 @@ pub fn declared(units: &[Unit]) -> Declared {
     .and_then(|file| std::fs::read(file).ok())
     .and_then(|bytes| serde_json::from_slice(&bytes).ok())
     .unwrap_or_default();
-  let stamps: Vec<Option<(u64, u64, u32)>> = units.iter().map(|unit| stamp(&unit.path)).collect();
+  let stamps: Vec<Option<(u64, u64)>> = units.iter().map(|unit| stamp(&unit.path)).collect();
   let mut nouns: Vec<Option<Vec<Noun>>> = units
     .iter()
     .zip(&stamps)
     .map(|(unit, stamp)| {
       let kept = before.units.get(&unit.path)?;
 
-      (Some((kept.size, kept.modified_seconds, kept.modified_nanos)) == *stamp).then(|| kept.nouns.clone())
+      (Some((kept.size, kept.modified_ms)) == *stamp).then(|| kept.nouns.clone())
     })
     .collect();
 
@@ -89,14 +90,13 @@ pub fn declared(units: &[Unit]) -> Declared {
       .zip(&stamps)
       .zip(&nouns)
       .filter_map(|((unit, stamp), nouns)| {
-        let (size, modified_seconds, modified_nanos) = (*stamp)?;
+        let (size, modified_ms) = (*stamp)?;
 
         Some((
           unit.path.clone(),
           Kept {
             size,
-            modified_seconds,
-            modified_nanos,
+            modified_ms,
             nouns: nouns.clone(),
           },
         ))
@@ -130,12 +130,13 @@ fn cache_file() -> Option<PathBuf> {
   Some(base.join("bmo-cli").join("nouns.json"))
 }
 
-// A file's size and modification time, which change whenever the file is replaced or written.
-fn stamp(path: &Path) -> Option<(u64, u64, u32)> {
+// A file's size and modification time in epoch milliseconds, which change whenever the file is replaced or
+// written.
+fn stamp(path: &Path) -> Option<(u64, u64)> {
   let meta = std::fs::metadata(path).ok()?;
   let since = meta.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
 
-  Some((meta.len(), since.as_secs(), since.subsec_nanos()))
+  Some((meta.len(), u64::try_from(since.as_millis()).ok()?))
 }
 
 // The cache written whole beside itself and moved into place, so a reader never sees half of it; a cache that

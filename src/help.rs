@@ -1,10 +1,9 @@
-//! The help: the options of `bmo`, then every noun with the unit command declaring it, every carried command
-//! with its unit, and every unit command the git rule reaches (docs/boundary.md, 「What `bmo` answers itself」).
+//! The help: the options of `bmo`, then every noun with the unit command declaring it, and every unit command
+//! the git rule reaches (docs/api.md, 「What `bmo` answers itself」).
 
 use std::fmt::Write as _;
 
 use crate::cache::Declared;
-use crate::carried;
 
 /// The help as printed.
 pub fn text(declared: &Declared) -> String {
@@ -21,12 +20,6 @@ pub fn text(declared: &Declared) -> String {
     declared.each().map(|(unit, noun)| (noun.spelled(), unit.name.as_str())).collect();
   nouns.sort();
   listed(&mut text, "Nouns", &nouns);
-
-  let mut carried: Vec<(String, &str)> = carried::all()
-    .flat_map(|carrier| carrier.commands().iter().map(move |command| (command.to_string(), carrier.unit())))
-    .collect();
-  carried.sort();
-  listed(&mut text, "Carried", &carried);
 
   let git: Vec<(String, &str)> = declared
     .units

@@ -1,5 +1,5 @@
 //! The unit commands on this machine: executables named `bmo-<name>`, in the directory holding `bmo`, then
-//! on `PATH` (docs/boundary.md, 「Unit commands」).
+//! on `PATH` (docs/api.md, 「The unit command」).
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;

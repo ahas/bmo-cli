@@ -17,8 +17,7 @@ These rules hold every change to this repository.
 ## Boundaries
 
 - **`bmo` holds no API and runs no service.** It finds the unit that carries a command and hands the
-  command to it, or calls the route that unit documents. It never reads another unit's code, tables or
-  files.
+  command to it. It never reads another unit's code, tables or files.
 - **Dependencies:** crates from the registry, and among other repositories only the base libraries
   `bmo-chat`, `bmo-chat-client` and `bmo-ui`. The testbed's `dependencies` check holds this.
 - **No lookup table standing in for polymorphism.** What differs per unit belongs to that unit: its
@@ -52,6 +51,6 @@ A change is not done before stage 3 has passed.
 ## Releasing
 
 - The version stands in `VERSION` and in the Cargo manifest, the same in both, in semver. The major
-  moves on a change a caller reads: the resolution order, the `nouns` reading, the exit codes or the
-  settings. The minor moves on an addition; the patch on anything else.
+  moves on a change a caller reads: the resolution order, the `nouns` reading or the exit codes. The
+  minor moves on an addition; the patch on anything else.
 - bmo-testbed builds and deploys this repository by `testbed.toml`.

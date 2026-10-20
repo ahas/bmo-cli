@@ -1,28 +1,21 @@
-//! The thin entry point's parts (docs/boundary.md): the words read, the unit commands found and the nouns
-//! they declare, a command resolved, and what is handed on or answered.
+//! The thin entry point's parts (docs/api.md): the words read, the unit commands found and the nouns they
+//! declare, a command resolved, and what is handed on or answered.
 
 pub mod answer;
 pub mod bridge;
 pub mod cache;
-pub mod carried;
-mod carriers;
 pub mod hand;
 pub mod help;
-pub mod http;
 pub mod line;
 pub mod nouns;
 pub mod resolve;
-pub mod settings;
-pub mod turn;
 pub mod units;
-pub mod unix_http;
 
 use std::ffi::OsString;
 use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::carried::Call;
 use crate::line::Line;
 use crate::resolve::Resolution;
 
@@ -84,17 +77,6 @@ pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
     Resolution::Noun { unit, noun } => home(noun.marked("home"))
       .unwrap_or_else(|| hand::hand(unit, hand::with_via(&words, noun.words.len(), via))),
     Resolution::Conflict { noun, one, other } => answer::conflict(&noun, one, other),
-    Resolution::Carried { carrier, command } => {
-      let rest = &words[command.split(' ').count()..];
-      let call = Call {
-        command,
-        rest,
-        via,
-        units: &declared.units,
-      };
-
-      home(carrier.home(&call)).unwrap_or_else(|| carrier.run(&call))
-    }
     Resolution::Git { unit } => hand::hand(unit, hand::with_via(&words[1..], 0, via)),
     Resolution::NotServed => answer::not_served(&words),
   }

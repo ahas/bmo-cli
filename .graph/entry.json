@@ -1,0 +1,44 @@
+[
+  {
+    "id": "entry/dispatch",
+    "title": "bmo command dispatch",
+    "what": "The thin entry point bmo: finds the bmo-<name> unit commands beside it and on PATH, reads and caches the nouns they declare, resolves a command by the longest declared noun or the git rule, and hands it on or answers it.",
+    "files": [
+      "src/main.rs",
+      "src/lib.rs",
+      "src/line.rs",
+      "src/units.rs",
+      "src/nouns.rs",
+      "src/cache.rs",
+      "src/resolve.rs",
+      "src/hand.rs",
+      "src/help.rs",
+      "src/answer.rs",
+      "docs/api.md",
+      "docs/inventory.md",
+      "tests/dispatch.rs",
+      "tests/support/mod.rs"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [],
+    "base": "7738682f852f57bddaaa04a5b42a36b78f9a6b7c",
+    "changed": 1792486513367
+  },
+  {
+    "id": "entry/home-bridge",
+    "title": "Home bridge client",
+    "what": "A command whose declared noun carries the home mark, asked on a work node, is handed whole to the operations machine over the socket BMO_HOME_BRIDGE names, and its relayed output and exit code are the run.",
+    "files": [
+      "src/bridge.rs",
+      "tests/bridge.rs"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "entry/dispatch"
+    ],
+    "base": "7738682f852f57bddaaa04a5b42a36b78f9a6b7c",
+    "changed": 1792486515834
+  }
+]

@@ -1,5 +1,5 @@
 //! A command handed to the unit command that carries it: `bmo` becomes that command, so its words, its
-//! environment, its standard streams and its exit code are the caller's (docs/boundary.md, 「Resolving a
+//! environment, its standard streams and its exit code are the caller's (docs/api.md, 「Resolving a
 //! command」).
 
 use std::ffi::OsString;

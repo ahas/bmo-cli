@@ -1,4 +1,4 @@
-//! The node's end of the home bridge (docs/boundary.md, 「The home bridge」): run on a work node, where
+//! The node's end of the home bridge (docs/api.md, 「The home bridge」): run on a work node, where
 //! `BMO_HOME_BRIDGE` names the bridge's socket, a home-bound command is handed whole to the operations
 //! machine: the binary's path under the deploy tree, every word, the run's own variables and the directory it
 //! was asked from, then its standing input. What comes back, output, errors and exit code, is this run's. A

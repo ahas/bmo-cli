@@ -1,10 +1,9 @@
-//! A command resolved in the order the contract gives: a declared noun, a carried command, the git rule, or
-//! nothing (docs/boundary.md, 「Resolving a command」).
+//! A command resolved in the order the contract gives: a declared noun, the git rule, or nothing
+//! (docs/api.md, 「Resolving a command」).
 
 use std::ffi::OsString;
 
 use crate::cache::Declared;
-use crate::carried::{self, Carried};
 use crate::nouns::Noun;
 use crate::units::Unit;
 
@@ -17,11 +16,6 @@ pub enum Resolution<'a> {
     noun: String,
     one: &'a Unit,
     other: &'a Unit,
-  },
-  /// A module of this repository carries the command.
-  Carried {
-    carrier: &'static dyn Carried,
-    command: &'static str,
   },
   /// The unit command named by the first word.
   Git { unit: &'a Unit },
@@ -51,15 +45,6 @@ pub fn resolve<'a>(words: &[OsString], declared: &'a Declared) -> Resolution<'a>
       },
       None => Resolution::Noun { unit, noun },
     };
-  }
-
-  let carried = carried::all()
-    .flat_map(|carrier| carrier.commands().iter().map(move |command| (carrier, *command)))
-    .filter(|(_, command)| starts_with(&command.split(' ').collect::<Vec<_>>()))
-    .max_by_key(|(_, command)| command.split(' ').count());
-
-  if let Some((carrier, command)) = carried {
-    return Resolution::Carried { carrier, command };
   }
 
   words

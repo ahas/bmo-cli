@@ -1,5 +1,5 @@
-//! The nouns a unit command declares when asked `nouns` (docs/boundary.md, 「Unit commands」). The answer is
-//! this platform's own protocol, one noun a line with its marks after a tab, so it is read here.
+//! The nouns a unit command declares when asked `nouns` (docs/api.md, 「The nouns a unit declares」). The
+//! answer is this platform's own protocol, one noun a line with its marks after a tab, so it is read here.
 
 use std::io::Read as _;
 use std::path::Path;
@@ -30,7 +30,7 @@ impl Noun {
 
   /// Whether its line carries `mark`.
   pub fn marked(&self, mark: &str) -> bool {
-    self.marks.iter().any(|carried| carried == mark)
+    self.marks.iter().any(|given| given == mark)
   }
 }
 
