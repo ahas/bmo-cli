@@ -19,8 +19,8 @@
       "entry/unit-commands",
       "entry/nouns"
     ],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961769
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360136
   },
   {
     "id": "entry/dispatch",
@@ -46,8 +46,8 @@
       "entry/answers",
       "entry/home-bridge"
     ],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497971701
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360140
   },
   {
     "id": "entry/hand",
@@ -65,8 +65,8 @@
       "entry/unit-commands",
       "entry/answers"
     ],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961776
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360150
   },
   {
     "id": "entry/home-bridge",
@@ -83,8 +83,8 @@
     ],
     "aliases": [],
     "needs": [],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961781
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360161
   },
   {
     "id": "entry/nouns",
@@ -106,8 +106,8 @@
     "needs": [
       "entry/unit-commands"
     ],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961756
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360176
   },
   {
     "id": "entry/resolution",
@@ -125,8 +125,8 @@
       "entry/nouns",
       "entry/unit-commands"
     ],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961763
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360183
   },
   {
     "id": "entry/unit-commands",
@@ -142,8 +142,8 @@
     ],
     "aliases": [],
     "needs": [],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961751
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360190
   },
   {
     "id": "entry/words",
@@ -157,7 +157,7 @@
     ],
     "aliases": [],
     "needs": [],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497961745
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360199
   }
 ]

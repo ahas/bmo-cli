@@ -19,8 +19,8 @@
       "entry/answers",
       "entry/home-bridge"
     ],
-    "base": "0b2abc198d9a7ac2c692ca98398f4f91667ab8c8",
-    "changed": 1792497971708,
+    "base": "19b26e877b114bad46458b2eff9e1a83729857b3",
+    "changed": 1792510360124,
     "boundary": {
       "side": "exposes"
     }

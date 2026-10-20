@@ -15,7 +15,7 @@ the way git finds `git-<command>`. A unit added later needs no new build of `bmo
 
 At the root stand the Cargo manifest, the version, `testbed.toml` (bmo-testbed's declaration of how this
 repository is tested, checked, built and deployed), the Korean ledger the testbed's `korean` check reads,
-`rustfmt.toml` and `CLAUDE.md`.
+`rustfmt.toml`, `CLAUDE.md` and the MIT licence in `LICENSE`.
 
 ## Documents
 
