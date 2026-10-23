@@ -3,6 +3,8 @@
 
 #![allow(dead_code)]
 
+pub mod stand_ins;
+
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};

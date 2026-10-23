@@ -1,5 +1,5 @@
-//! The help: the options of `bmo`, then every noun with the unit command declaring it, and every unit command
-//! the git rule reaches (docs/api.md, 「What `bmo` answers itself」).
+//! The help: the options of `bmo` and its own verb, then every noun with the unit command declaring it, and
+//! every unit command the git rule reaches (docs/api.md, 「What `bmo` answers itself」).
 
 use std::fmt::Write as _;
 
@@ -13,7 +13,9 @@ pub fn text(declared: &Declared) -> String {
      Options:\n      \
      --via <ROAD>  The road the caller was told its turn is read on, handed on with the command\n  \
      -h, --help        This help\n      \
-     --version     The version of bmo\n",
+     --version     The version of bmo\n\n\
+     Its own verb:\n  \
+     use <TOOL>        Calls a hosted tool through the tool host's toolbook (bmo use --help)\n",
   );
 
   let mut nouns: Vec<(String, &str)> =

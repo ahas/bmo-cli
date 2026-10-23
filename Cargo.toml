@@ -2,7 +2,7 @@
 # binary `bmo` hands the command to it. Its tests stand in `tests/`.
 [package]
 name = "bmo-cli"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -18,12 +18,18 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-clap ={ version = "4.5.40", default-features = false, features = ["std", "derive", "error-context", "usage"] }
+clap ={ version = "4.5.40", default-features = false, features = ["std", "derive", "error-context", "help", "usage"] }
+# The tool verb reads the env files the tool host and the receiver publish under the data root.
+dotenvy = "0.15.7"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.138"
+# The tool verb's calls on the loopback address: the toolbook and the receiver's instruction route.
+ureq = { version = "3.5.0", default-features = false, features = ["json"] }
 
 [dev-dependencies]
 # The personal-data check reads each tracked file for a mail address, a home path, a telephone number, a
 # token and a private network address.
 regex = "1.13.1"
 tempfile = "3.20.0"
+# The stand-in tool host and receiver the tool verb's tests call.
+tiny_http = "0.12.0"

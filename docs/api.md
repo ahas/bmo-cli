@@ -1,11 +1,12 @@
 # The fixed API: how `bmo` finds a unit's command and hands it on
 
-**고정됨 1.0.0.**
+**고정됨 1.1.0.**
 
 `bmo` holds no API and runs no service. It reads the words it is given, finds the unit command that carries
-them, and hands them on; what it answers itself is the help, the version and a refusal. This document is the
-whole of that contract: the command-finding rule and the hand-over, and nothing else. `bmo` publishes no HTTP
-API, so it publishes no OpenAPI schema and no generated client; its fixed API is the command line below.
+them, and hands them on; what it answers itself is the help, the version, a refusal and its one verb, `use`,
+which reaches a hosted tool. This document is the whole of that contract: the command-finding rule, the
+hand-over and the verb, and nothing else. `bmo` publishes no HTTP API, so it publishes no OpenAPI schema and no
+generated client; its fixed API is the command line below.
 
 ## The unit command
 
@@ -29,6 +30,8 @@ API, so it publishes no OpenAPI schema and no generated client; its fixed API is
 - **The mark `home`** says the noun's commands run on the operations machine. Where a run is asked on a work
   node, `bmo` hands such a command to the home bridge (「The home bridge」).
 - **The word `nouns` is the protocol's own** and is never dispatched.
+- **The word `use` is `bmo`'s own** (「The tool verb」): a unit declaring it as a noun, or a unit command
+  `bmo-use`, is never reached by it.
 - **Every unit's command list is its own.** A unit's document names the nouns its command carries; `bmo` keeps
   no list of them, and a noun a unit does not declare is not served.
 
@@ -36,14 +39,15 @@ API, so it publishes no OpenAPI schema and no generated client; its fixed API is
 
 The words `bmo` is given are read in this order, and the first rule that matches decides.
 
-1. **A declared noun.** The leading words are compared with every noun every unit command declares, and the
+1. **`bmo`'s own verb.** Where the first word is `use`, `bmo` answers the command itself (「The tool verb」).
+2. **A declared noun.** The leading words are compared with every noun every unit command declares, and the
    longest noun matching them wins. `bmo` runs that unit command with all the words, the noun included:
    `bmo todo --add` runs `bmo-job todo --add`. Where two unit commands declare the longest matching noun, `bmo`
    refuses, naming the noun and both commands, and ends with 2.
-2. **The git rule.** Where the first word is `<name>` and a unit command `bmo-<name>` stands, `bmo` runs it
+3. **The git rule.** Where the first word is `<name>` and a unit command `bmo-<name>` stands, `bmo` runs it
    with the words after the first: `bmo graph nodes` runs `bmo-graph nodes`. The unit's own answer stands, its
    refusal of words it does not carry included.
-3. **Not served.** Nothing above matched (「What `bmo` answers itself」).
+4. **Not served.** Nothing above matched (「What `bmo` answers itself」).
 
 - **What is handed on unchanged:** the words, in their order; the environment; standard input, output and
   error; and the unit's exit code, which is `bmo`'s.
@@ -67,8 +71,9 @@ The words `bmo` is given are read in this order, and the first rule that matches
 | a noun two unit commands declare | ``bmo: `<noun>` is declared by both `bmo-<one>` and `bmo-<other>` `` on standard error | 2 |
 | a unit command that cannot be started | ``bmo: `bmo-<unit>` could not be started: <reason>`` on standard error | 1 |
 | an option before the first word that `bmo` does not read | ``bmo: `<option>` is not an option of bmo; options of a command follow its words`` on standard error | 2 |
+| `bmo use …` | the tool verb's own answer (「The tool verb」) | the verb's |
 
-- **The help** lists the global options, then every noun found, each with the unit command declaring it, then
+- **The help** lists the global options and the tool verb, then every noun found, each with the unit command declaring it, then
   every unit command the git rule reaches.
 - **The words of a not-served answer** are the words as given, the leading options taken out.
 
@@ -96,12 +101,116 @@ handed whole to the operations machine, and what comes back is the run's own.
   `bmo` ends with; a code outside 0 to 255 ends it with 1. Frames on any other channel are passed over. A
   bridge that drops the connection before channel 3 is answered on standard error, and `bmo` ends with 2.
 
+## The tool verb
+
+`bmo use` reaches one hosted tool: it asks the tool host's toolbook what the tool is, calls it, and answers what
+it said, either at once or, started as a unit of its own, by waking the asking agent once it is done. The tool
+host's own documents state the toolbook and the tools face; the receiver's state the instruction route. `use`
+calls each across that published contract and reads nothing else of theirs.
+
+| Asked | What it does |
+|---|---|
+| `bmo use <tool> [--sync] [--arg <key>=<value>]… [--json <object>]` | calls the tool and waits for its answer |
+| `bmo use <tool> --async [--memory <words>] [--room <room>] [--agent <name>] [--arg …]… [--json …]` | starts the call as a unit of its own and answers its id |
+| `bmo use --list` | every record kept, one a line |
+| `bmo use --status <id>` | one record, as JSON |
+| `bmo use --help` | the verb's usage |
+
+### Reaching the tool host
+
+- **`<tool>` is a full name,** `<namespace>/<name>`, as the toolbook's `list` names it.
+- **The toolbook is asked over the tools face,** MCP over HTTP at `/mcp/toolbook` on the loopback address,
+  every request one `tools/call` standing alone. The port is `BMO_MCP_HOST_PORT`, else the one the data root's
+  `env/pocket.env` names, else 3290.
+- **The token is the caller's own tool session's,** `BMO_MCP_TOKEN`, so the call is made under the caller's own
+  record, its capabilities and grants. Where none is set, `use` says so and ends with 2.
+- **The data root** is `BMO_DATA_DIR`, else `.local/share/bmo/data` in the home directory.
+- **The tool is resolved first with `describe`,** whose answer names which of `call` and `act` reaches it and
+  carries its input schema. A tool that only reads is called with `call`, one that acts with `act`.
+
+### The arguments
+
+- **`--arg <key>=<value>`,** given any number of times, sets one argument. Where the tool's input schema types
+  the key as a string, the value is that string as written; otherwise it is read as JSON where it reads, a number,
+  a boolean, an array or an object, and as a string where it does not.
+- **`--json <object>`** gives the arguments as one JSON object; each `--arg` is laid over it. No argument given
+  is the empty object.
+
+### The answer
+
+- **Synchronous, the default:** the tool's answer on standard output. Where the tool answers structured content,
+  that object as JSON; where every piece it answers is text, each piece's text as it stands; otherwise its
+  content pieces as one JSON array.
+- **A refusal** is a line on standard error, ``bmo: `<tool>` was refused: <code>: <why>``, and `use` ends with 1:
+  - the host's refusal of the request, by its error body's `code` and `error`;
+  - a tool answer marked failed, the toolbook's refusal of an unknown tool or of a `call` of a tool that acts
+    among them, by the code `refused` and the answer's text;
+  - a host out of reach, by the code `unreachable`;
+  - a `describe` answer that names neither `call` nor `act`, by the code `unread`.
+- **Exit codes:** 0 where the tool answered, 1 where the call was refused, 2 where the words or the token could
+  not be read.
+
+### Asynchronous: a unit of its own
+
+- **`--async` resolves the tool as a synchronous call does,** so an unknown tool is refused at once, then keeps a
+  record and starts the call as a transient user unit, and answers on standard output one JSON object: `id`,
+  `unit` and `record`, the record's folder. The caller's turn goes on; the answer comes as a wake.
+- **A unit that cannot be started** is said on standard error, its record is taken back, and `use` ends with 1.
+- **The id** is the tool's namespace and name joined by `-`, every character but a letter, a digit, `_` and `-`
+  made `-`, then `-` and eight hexadecimal digits drawn afresh. The unit is `bmo-use-<id>`.
+- **The unit** is started with `systemd-run --user --unit=bmo-use-<id> --collect --quiet`, each variable below
+  set with `--setenv`, and runs the same `bmo` binary as `use --run <id>`, a word for the unit alone. It is handed
+  `BMO_DATA_DIR`, the data root resolved, and, by name from the caller's environment where they are set,
+  `BMO_MCP_TOKEN`, `BMO_MCP_HOST_PORT`, `RECEIVER_ADDRESS` and `RECEIVER_TOKEN`; no token stands on its command
+  line.
+- **The record is a folder,** `use/<id>/` under the data root, readable by the user alone:
+  - `request.json`, written before the unit starts: `id`, `tool`, `reachedBy` (`call` or `act`), `arguments`,
+    `memory`, `room`, `agent`, `via`, `unit` and `startedAt`;
+  - `answer.json`, once the call ends: the tool's result as the host answered it, or the refusal as
+    `{code, error}`;
+  - `end.json`, last: `endedAt`, `state` (`done` or `refused`), `summary`, and `wake`, the instruction's `id`
+    where the receiver queued it or `error` where it did not.
+- **The run calls the tool as a synchronous call does,** through the proxy the request names; a run with no
+  token is refused by the code `unauthorized`. A refusal is its answer and ends it as `refused`.
+- **`--memory <words>`** is what the caller wants handed back with the answer: what it was waiting for and what it
+  meant to do next. It is kept in the record and carried in the wake.
+- **Whom the wake is for:** the room `--room` names, else `BMO_TURN_CHAT`; the agent `--agent` names, else
+  `BMO_TURN_AGENT`; the road `--via` before the first word names, else `BMO_TURN_VIA`. Each is left out where none
+  is named, and the receiver chooses as its route states.
+
+### The wake
+
+- **The run wakes the agent through the receiver's `POST /instructions`,** at `RECEIVER_ADDRESS` with
+  `RECEIVER_TOKEN` as the bearer, else the two the data root's `env/receiver.env` names, once the answer is kept;
+  the end is kept after it, with the wake's outcome. The instruction is a fact, queued in the room for the agent
+  as a job's end is:
+  - `agentName`, `room` and `via` as above;
+  - `said.fact`: `use`, the id; `tool`; `state`; `answer`, the path of `answer.json`; `summary`; and `memory`;
+  - `sort` `use-ended` and `summary`, the one-line summary;
+  - no `kind`, so no wake replaces another, and no expiry, events, ride or run.
+- **The summary** is one line: ``<tool> answered: <first line of its first text>`` or ``<tool> was refused:
+  <code>: <why>``, cut to 160 characters.
+- **A wake the receiver refuses or does not answer** is kept in `end.json` as its `error`, and the unit ends with 1.
+
+### Reading the records
+
+- **`bmo use --list`** writes every record under `use/`, oldest first, one a line: its id, its state and its tool,
+  separated by two spaces.
+- **`bmo use --status <id>`** writes one record as a JSON object: the request's fields, `state`, and where it
+  ended, `endedAt`, `summary`, `answer` (the path of `answer.json`) and `wake`. An id with no record ends with 2.
+- **A record's state** is its end's where `end.json` stands; else `running` while its unit is active, and `lost`
+  once it is not, as where the machine restarted under it.
+
 ## What `bmo` does not hold
 
 - **No per-unit command list.** Each unit's own document names the words its command carries; `bmo` serves a
   noun only where the unit declares it, and the git rule only where the unit command stands.
-- **No call to a unit's service.** `bmo` calls no unit's route and reads no unit's code, tables or files.
-- **No settings.** `bmo` reads no settings file; a unit reads what its own settings name.
+- **No call to a unit's service but the tool verb's.** `bmo` calls no unit's route but the tool host's tools
+  face and the receiver's instruction route, both for `use`, and reads no unit's code, tables or files; of the
+  data root it reads only the env files those two units publish for their callers and writes only its own `use/`
+  folder.
+- **No settings of its own.** `bmo` keeps no settings file; a unit reads what its own settings name, and the tool
+  verb reads the variables and env files 「The tool verb」 names.
 - **No alias table.** An alias is served only where a unit declares it as a noun or the git rule reaches it.
 
 ## Versioning
@@ -110,4 +219,4 @@ handed whole to the operations machine, and what comes back is the run's own.
   manifest.
 - **The major moves on a change a caller or a unit reads:** the resolution order, the reading of `nouns`, the
   placing of `--via`, an exit code, or an answer's words. The minor moves on an addition: a mark `bmo`
-  understands, an option of `bmo`. The patch moves on anything else.
+  understands, an option of `bmo` or of its verb, a verb of its own. The patch moves on anything else.

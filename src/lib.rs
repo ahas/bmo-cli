@@ -1,5 +1,5 @@
 //! The thin entry point's parts (docs/api.md): the words read, the unit commands found and the nouns they
-//! declare, a command resolved, and what is handed on or answered.
+//! declare, a command resolved, and what is handed on or answered, the tool verb among it.
 
 pub mod answer;
 pub mod bridge;
@@ -9,6 +9,7 @@ pub mod help;
 pub mod line;
 pub mod nouns;
 pub mod resolve;
+pub mod tool_use;
 pub mod units;
 
 use std::ffi::OsString;
@@ -68,6 +69,11 @@ pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
   }
 
   let via = line.via.as_deref();
+
+  if words[0] == "use" {
+    return tool_use::run(&words[1..], via);
+  }
+
   // A home-bound command asked on a work node is handed to the operations machine with every word given.
   let given = arguments.get(1..).unwrap_or_default();
   let home =

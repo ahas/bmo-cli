@@ -18,6 +18,8 @@ These rules hold every change to this repository.
 
 - **`bmo` holds no API and runs no service.** It finds the unit that carries a command and hands the
   command to it. It never reads another unit's code, tables or files.
+- **Its one verb, `use`, reaches a hosted tool** across the tool host's and the receiver's published APIs, as
+  `docs/api.md` states in 「The tool verb」; it is the only place `bmo` calls a unit's route.
 - **Dependencies:** crates from the registry, and among other repositories only the base libraries
   `bmo-chat`, `bmo-chat-client` and `bmo-ui`. The testbed's `dependencies` check holds this.
 - **No lookup table standing in for polymorphism.** What differs per unit belongs to that unit: its
