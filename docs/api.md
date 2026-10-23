@@ -1,6 +1,6 @@
 # The fixed API: how `bmo` finds a unit's command and hands it on
 
-**고정됨 1.2.0.**
+**고정됨 1.2.1.**
 
 `bmo` holds no API and runs no service. It reads the words it is given, finds the unit command that carries
 them, and hands them on; what it answers itself is the help, the version, a refusal and its one verb, `use`,
@@ -235,6 +235,20 @@ route. `use` calls each across that published contract and reads nothing else of
   ended, `endedAt`, `summary`, `answer` (the path of `answer.json`) and `wake`. An id with no record ends with 2.
 - **A record's state** is its end's where `end.json` stands; else `running` while its unit is active, and `lost`
   once it is not, as where the machine restarted under it.
+
+### Waiting is the caller's, not the tool's
+
+- **Whether a turn waits for a tool is chosen once, by `--sync` or `--async`,** never by an argument of the tool:
+  every tool runs the same either way, and the flag decides only whether the asking call or a later wake takes
+  the answer.
+- **A reminder** is an asynchronous `use` of a tool that waits for a moment and answers with a note, the
+  receiver's `bmo/wait`; **a watch** is one of a tool that answers once a condition holds, the receiver's
+  `bmo/watch`; **a long call** is any tool run asynchronously, a draw that announces its result in a later turn
+  among them. Each wakes the agent once, as 「The wake」 states, with the tool's answer and the `--memory` it was
+  given; a repeating reminder is the next one set by the turn its wake opens.
+- **A wait longer than a day** needs `--max-seconds` past it, since the unit is stopped at its longest run.
+- **Cancelling one** is stopping its unit, `bmo-use-<id>`; its last word keeps the end as `failed` and wakes the
+  agent with it, so the agent learns the wait is gone.
 
 ## Where `bmo` stands
 
