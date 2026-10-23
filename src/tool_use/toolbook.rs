@@ -26,12 +26,22 @@ impl Refusal {
   }
 }
 
-/// A tool as `describe` answers it: which proxy reaches it and its input schema.
+/// A tool as `describe` answers it: which proxy reaches it, its input schema, and the whole object the host
+/// answered.
 #[derive(Debug, Clone)]
 pub struct Described {
   pub tool: String,
   pub reached_by: String,
   pub input: Value,
+  pub shape: Value,
+}
+
+/// One tool as `list` answers it: its full name, which proxy reaches it, and its description's first sentence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Listed {
+  pub tool: String,
+  pub reached_by: String,
+  pub summary: String,
 }
 
 /// The toolbook of the caller's tool session.
@@ -58,7 +68,7 @@ impl Toolbook {
     })
   }
 
-  /// `tool` as `describe` answers it.
+  /// `tool` as `describe` answers it, read by its structured content.
   pub fn describe(&self, tool: &str) -> Result<Described, Refusal> {
     let result = self.ask("describe", json!({ "tool": tool }))?;
 
@@ -66,25 +76,42 @@ impl Toolbook {
       return Err(refusal);
     }
 
-    let text = texts(&result).unwrap_or_default().join("\n");
-    let reached_by = text
-      .lines()
-      .next()
-      .and_then(|first| first.rsplit_once("reached with "))
-      .map(|(_, proxy)| proxy.trim())
-      .filter(|proxy| matches!(*proxy, "call" | "act"))
+    let shape = result["structuredContent"].clone();
+    let reached_by = proxy(&shape["reachedBy"])
       .ok_or_else(|| Refusal::new("unread", format!("describe named neither call nor act for {tool}")))?;
-    let input = text
-      .lines()
-      .find_map(|line| line.strip_prefix("Input schema: "))
-      .and_then(|schema| serde_json::from_str(schema).ok())
-      .unwrap_or(Value::Null);
 
     Ok(Described {
       tool: tool.to_owned(),
-      reached_by: reached_by.to_owned(),
-      input,
+      reached_by,
+      input: shape["input"].clone(),
+      shape,
     })
+  }
+
+  /// The tools `list` answers, narrowed by `query` where one is given, read by its structured content.
+  pub fn list(&self, query: Option<&str>) -> Result<Vec<Listed>, Refusal> {
+    let asked = query.map_or_else(|| json!({}), |query| json!({ "query": query }));
+    let result = self.ask("list", asked)?;
+
+    if let Some(refusal) = refusal_of(&result) {
+      return Err(refusal);
+    }
+
+    let unread = || Refusal::new("unread", "list answered no items a program reads");
+
+    result["structuredContent"]["items"]
+      .as_array()
+      .ok_or_else(unread)?
+      .iter()
+      .map(|item| {
+        Some(Listed {
+          tool: item["tool"].as_str()?.to_owned(),
+          reached_by: proxy(&item["reachedBy"])?,
+          summary: item["summary"].as_str().unwrap_or_default().to_owned(),
+        })
+      })
+      .collect::<Option<Vec<Listed>>>()
+      .ok_or_else(unread)
   }
 
   /// `tool` called through `reached_by` with `arguments`: the tool's result as the host answered it, a result
@@ -138,6 +165,11 @@ impl Toolbook {
 
     Ok(body.get("result").cloned().unwrap_or(Value::Null))
   }
+}
+
+// `call` or `act`, where the value names one of them.
+fn proxy(value: &Value) -> Option<String> {
+  value.as_str().filter(|proxy| matches!(*proxy, "call" | "act")).map(str::to_owned)
 }
 
 /// The refusal a result carries where the tool or the toolbook marked it failed.

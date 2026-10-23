@@ -201,9 +201,21 @@ fn the_help_names_the_verb_and_use_help_its_words() {
   assert!(output.status.success());
   assert!(usage.contains("Usage: bmo use"), "{usage}");
   assert!(
-    ["--async", "--sync", "--arg", "--json", "--memory", "--list", "--status"]
-      .iter()
-      .all(|word| usage.contains(word))
+    [
+      "--async",
+      "--sync",
+      "--arg",
+      "--json",
+      "--memory",
+      "--max-seconds",
+      "--tools",
+      "--query",
+      "--describe",
+      "--list",
+      "--status"
+    ]
+    .iter()
+    .all(|word| usage.contains(word))
   );
 }
 
@@ -248,6 +260,7 @@ fn an_async_start_keeps_the_record_and_starts_the_unit() {
   assert_eq!(request["room"], -5);
   assert_eq!(request["agent"], "agent-a");
   assert_eq!(request["via"], Value::Null);
+  assert_eq!(request["maxSeconds"], 86400);
   assert!(!place.join("end.json").exists());
   assert_eq!(stage.asked(), [("describe".to_owned(), "web/read".to_owned())]);
 
@@ -260,6 +273,8 @@ fn an_async_start_keeps_the_record_and_starts_the_unit() {
       format!("--unit=bmo-use-{id}"),
       "--collect".to_owned(),
       "--quiet".to_owned(),
+      "--property=RuntimeMaxSec=86400".to_owned(),
+      format!("--property=ExecStopPost={exe} use --ended {id}"),
       format!("--setenv=BMO_DATA_DIR={}", stage.root().display()),
       "--setenv=BMO_MCP_TOKEN".to_owned(),
       "--setenv=BMO_MCP_HOST_PORT".to_owned(),
@@ -428,4 +443,109 @@ fn a_status_of_no_record_ends_with_2() {
   for id in ["web-read-00000000", "../escape"] {
     assert_eq!(stage.bmo(&["use", "--status", id]).status.code(), Some(2), "{id}");
   }
+}
+
+#[test]
+fn the_tools_are_listed_one_a_line_and_narrowed_by_a_query() {
+  let stage = Stage::new();
+
+  let output = stage.bmo(&["use", "--tools"]);
+
+  assert!(output.status.success(), "{}", errors(&output));
+  assert_eq!(
+    lines(&output),
+    [
+      "bmo/say  act  Says a line.",
+      "web/read  call  Reads a page.",
+      "web/shape  call  Shapes."
+    ]
+  );
+  assert_eq!(stage.host.sent()[0].body["params"], json!({ "name": "list", "arguments": {} }));
+
+  let narrowed = stage.bmo(&["use", "--tools", "--query", "say"]);
+
+  assert_eq!(lines(&narrowed), ["bmo/say  act  Says a line."]);
+  assert_eq!(stage.host.sent()[1].body["params"]["arguments"], json!({ "query": "say" }));
+
+  let none = stage.bmo(&["use", "--tools", "--query", "nothing"]);
+
+  assert!(none.status.success(), "{}", errors(&none));
+  assert!(lines(&none).is_empty());
+  assert!(errors(&none).contains("no tool is listed for `nothing`"), "{}", errors(&none));
+}
+
+#[test]
+fn a_tool_described_is_printed_as_the_hosts_object_and_not_called() {
+  let stage = Stage::new();
+
+  let output = stage.bmo(&["use", "bmo/say", "--describe"]);
+
+  assert!(output.status.success(), "{}", errors(&output));
+
+  let shape: Value = serde_json::from_slice(&output.stdout).unwrap();
+
+  assert_eq!(shape["reachedBy"], "act");
+  assert_eq!(shape["manual"], "Call bmo/say well.");
+  assert_eq!(shape["input"]["properties"]["text"]["type"], "string");
+  assert_eq!(stage.asked(), [("describe".to_owned(), "bmo/say".to_owned())]);
+  assert_eq!(stage.bmo(&["use", "web/nope", "--describe"]).status.code(), Some(1));
+  assert_eq!(stage.bmo(&["use", "bmo/say", "--describe", "--async"]).status.code(), Some(2));
+}
+
+#[test]
+fn a_longest_run_given_is_the_units_and_the_records() {
+  let stage = Stage::new();
+  let id = stage.started(&["use", "web/read", "--async", "--max-seconds", "90"]);
+
+  assert!(stage.unit_words().contains(&"--property=RuntimeMaxSec=90".to_owned()));
+  assert_eq!(read(&stage.root().join("use").join(&id).join("request.json"))["maxSeconds"], 90);
+  assert_eq!(stage.bmo(&["use", "web/read", "--async", "--max-seconds", "0"]).status.code(), Some(2));
+  assert_eq!(stage.bmo(&["use", "web/read", "--max-seconds", "90"]).status.code(), Some(2));
+}
+
+#[test]
+fn a_unit_that_stopped_before_its_end_wakes_the_agent_with_the_failure() {
+  let stage = Stage::new();
+  let id = stage.started(&["use", "web/read", "--async", "--memory", "tell the owner"]);
+  let place = stage.root().join("use").join(&id);
+  let mut command = stage.bench.bmo_command(&["use", "--ended", &id]);
+
+  command
+    .env("BMO_DATA_DIR", stage.root())
+    .env("RECEIVER_ADDRESS", stage.receiver.address())
+    .env("RECEIVER_TOKEN", RECEIVER_TOKEN)
+    .env("SERVICE_RESULT", "timeout")
+    .env("EXIT_CODE", "killed")
+    .env("EXIT_STATUS", "TERM");
+
+  let last_word = support::run(command, None);
+
+  assert!(last_word.status.success(), "{}", errors(&last_word));
+
+  let why = "its unit stopped before the call ended (result timeout, exit killed TERM)";
+
+  assert_eq!(read(&place.join("answer.json")), json!({ "code": "failed", "error": why }));
+
+  let fact = &stage.receiver.sent()[0].body;
+
+  assert_eq!(fact["said"]["fact"]["state"], "failed");
+  assert_eq!(fact["said"]["fact"]["memory"], "tell the owner");
+  assert_eq!(fact["summary"], format!("web/read failed: {why}"));
+  assert_eq!(read(&place.join("end.json"))["state"], "failed");
+  assert_eq!(lines(&stage.bmo(&["use", "--list"])), [format!("{id}  failed  web/read")]);
+}
+
+#[test]
+fn a_units_last_word_after_its_end_does_nothing() {
+  let stage = Stage::new();
+  let id = stage.started(&["use", "web/read", "--async"]);
+
+  assert!(stage.bmo(&["use", "--run", &id]).status.success());
+
+  let end = read(&stage.root().join("use").join(&id).join("end.json"));
+  let last_word = stage.bmo(&["use", "--ended", &id]);
+
+  assert!(last_word.status.success(), "{}", errors(&last_word));
+  assert_eq!(stage.receiver.sent().len(), 1);
+  assert_eq!(read(&stage.root().join("use").join(&id).join("end.json")), end);
 }

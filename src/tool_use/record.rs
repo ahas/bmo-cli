@@ -32,6 +32,9 @@ pub struct Request {
   pub agent: Option<String>,
   pub via: Option<String>,
   pub unit: String,
+  /// The unit's longest run, in seconds.
+  #[serde(default)]
+  pub max_seconds: u64,
   pub started_at: i64,
 }
 

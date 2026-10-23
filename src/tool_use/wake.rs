@@ -39,6 +39,14 @@ pub fn summary(tool: &str, outcome: &Result<Value, Refusal>) -> String {
   line.chars().take(SUMMARY_CHARS).collect()
 }
 
+/// One line saying that a call of `tool` failed, and why.
+pub fn failure_summary(tool: &str, why: &str) -> String {
+  format!("{tool} failed: {}", why.lines().next().unwrap_or_default())
+    .chars()
+    .take(SUMMARY_CHARS)
+    .collect()
+}
+
 /// The instruction a call's end is queued as.
 pub fn body(request: &Request, state: &str, answer: &Path, summary: &str) -> Value {
   json!({

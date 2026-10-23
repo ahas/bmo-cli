@@ -42,7 +42,8 @@ impl StandIn {
 }
 
 /// A tool host whose toolbook holds `web/read` (a read answering text), `web/shape` (a read answering
-/// structured content) and `bmo/say` (an act), and refuses every other tool and every other token.
+/// structured content) and `bmo/say` (an act), lists them, narrowed by a query naming `say`, and refuses every
+/// other tool and every other token.
 pub fn tool_host() -> StandIn {
   serve(|sent| {
     if sent.bearer != format!("Bearer {SESSION_TOKEN}") {
@@ -53,17 +54,36 @@ pub fn tool_host() -> StandIn {
     let tool = params["arguments"]["tool"].as_str().unwrap_or_default().to_owned();
     let arguments = &params["arguments"]["arguments"];
     let result = match (params["name"].as_str().unwrap_or_default(), tool.as_str()) {
-      ("describe", "web/read") => text(
-        "web/read — reached with call\nReads a page.\nRead-only: yes\nInput schema: \
-         {\"properties\":{\"name\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}},\"type\":\"object\"}",
+      ("describe", "web/read") => described(
+        "web/read",
+        "call",
+        "Reads a page.",
+        json!({ "properties": { "name": { "type": "string" }, "count": { "type": "integer" } }, "type": "object" }),
       ),
-      ("describe", "web/shape") => {
-        text("web/shape — reached with call\nShapes.\nRead-only: yes\nInput schema: {}")
+      ("describe", "web/shape") => described("web/shape", "call", "Shapes.", json!({})),
+      ("describe", "bmo/say") => described(
+        "bmo/say",
+        "act",
+        "Says a line.",
+        json!({ "properties": { "text": { "type": "string" } }, "type": "object" }),
+      ),
+      ("list", _) => {
+        let items: Vec<Value> = [
+          ("bmo/say", "act", "Says a line."),
+          ("web/read", "call", "Reads a page."),
+          ("web/shape", "call", "Shapes."),
+        ]
+        .into_iter()
+        .filter(|(tool, ..)| params["arguments"]["query"].as_str().is_none_or(|query| tool.contains(query)))
+        .map(|(tool, reached_by, summary)| json!({ "tool": tool, "reachedBy": reached_by, "summary": summary }))
+        .collect();
+
+        json!({
+          "content": [{ "type": "text", "text": "the list's lines" }],
+          "structuredContent": { "items": items },
+          "isError": false,
+        })
       }
-      ("describe", "bmo/say") => text(
-        "bmo/say — reached with act\nSays a line.\nRead-only: no\nInput schema: \
-         {\"properties\":{\"text\":{\"type\":\"string\"}},\"type\":\"object\"}",
-      ),
       ("call", "web/read") => text(&format!("read {arguments}\nsecond line")),
       ("call", "web/shape") => json!({
         "content": [{ "type": "text", "text": "{\"shape\":\"round\"}" }],
@@ -87,6 +107,25 @@ pub fn receiver() -> StandIn {
     }
     ("POST", "/instructions") => (201, json!({ "id": INSTRUCTION })),
     _ => (404, json!({ "code": "no-route", "error": "no route answers this" })),
+  })
+}
+
+// A tool described as the toolbook describes one: its text, and the tool's shape as structured content.
+fn described(tool: &str, reached_by: &str, description: &str, input: Value) -> Value {
+  let (namespace, name) = tool.split_once('/').unwrap();
+
+  json!({
+    "content": [{ "type": "text", "text": format!("{tool} — reached with {reached_by}\n{description}") }],
+    "structuredContent": {
+      "namespace": namespace,
+      "name": name,
+      "description": description,
+      "manual": format!("Call {tool} well."),
+      "input": input,
+      "hints": { "readOnly": reached_by == "call" },
+      "reachedBy": reached_by,
+    },
+    "isError": false,
   })
 }
 

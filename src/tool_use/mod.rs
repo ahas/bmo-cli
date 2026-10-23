@@ -17,6 +17,9 @@ use serde_json::{Value, json};
 use self::record::{End, Request};
 use self::toolbook::{Refusal, Toolbook};
 
+/// A unit's longest run where the words name none: one day, in seconds.
+pub const DEFAULT_MAX_SECONDS: u64 = 86_400;
+
 /// The words `bmo use` reads.
 #[derive(Parser, Debug)]
 #[command(
@@ -26,8 +29,11 @@ use self::toolbook::{Refusal, Toolbook};
 )]
 pub struct UseLine {
   /// The tool's full name, `<namespace>/<name>`.
-  #[arg(value_name = "TOOL", required_unless_present_any = ["list", "status", "run"])]
+  #[arg(value_name = "TOOL", required_unless_present_any = ["list", "status", "run", "tools", "ended"])]
   pub tool: Option<String>,
+  /// Print the tool as the host describes it, as JSON, instead of calling it.
+  #[arg(long, conflicts_with_all = ["asynchronous", "sync", "args", "json"])]
+  pub describe: bool,
   /// Call the tool and wait for its answer (the default).
   #[arg(long, conflicts_with = "asynchronous")]
   pub sync: bool,
@@ -49,6 +55,20 @@ pub struct UseLine {
   /// The agent the wake is for, else BMO_TURN_AGENT.
   #[arg(long, value_name = "NAME", requires = "asynchronous")]
   pub agent: Option<String>,
+  /// The unit's longest run, in seconds; one day where none is given.
+  #[arg(
+    long,
+    value_name = "SECONDS",
+    requires = "asynchronous",
+    value_parser = clap::value_parser!(u64).range(1..)
+  )]
+  pub max_seconds: Option<u64>,
+  /// The tools use reaches, one a line.
+  #[arg(long, conflicts_with_all = ["tool", "status", "run", "list", "ended"])]
+  pub tools: bool,
+  /// Words a listed tool's full name or description holds.
+  #[arg(long, value_name = "WORDS", requires = "tools")]
+  pub query: Option<String>,
   /// Every record kept, one a line.
   #[arg(long, conflicts_with_all = ["tool", "status", "run"])]
   pub list: bool,
@@ -58,6 +78,9 @@ pub struct UseLine {
   /// Runs a kept call; the unit's own word.
   #[arg(long, value_name = "ID", hide = true, conflicts_with = "tool")]
   pub run: Option<String>,
+  /// Ends a kept call whose unit stopped; the unit's own last word.
+  #[arg(long, value_name = "ID", hide = true, conflicts_with_all = ["tool", "run"])]
+  pub ended: Option<String>,
 }
 
 /// Answers `bmo use` given `words`, the road the caller named before the first word with it.
@@ -82,6 +105,14 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
     return ran(&root, id);
   }
 
+  if let Some(id) = &line.ended {
+    return ended(&root, id);
+  }
+
+  if line.tools {
+    return tools(&root, line.query.as_deref());
+  }
+
   let tool = line.tool.clone().unwrap_or_default();
   let book = match Toolbook::found(&root) {
     Ok(book) => book,
@@ -91,6 +122,13 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
     Ok(described) => described,
     Err(refusal) => return refused(&tool, &refusal),
   };
+
+  if line.describe {
+    println!("{}", serde_json::to_string_pretty(&described.shape).unwrap_or_default());
+
+    return ExitCode::SUCCESS;
+  }
+
   let arguments = match toolbook::arguments(line.json.as_deref(), &line.args, &described.input) {
     Ok(arguments) => arguments,
     Err(why) => return unread(&why),
@@ -123,6 +161,7 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
       .or_else(|| ground::variable("BMO_TURN_CHAT").and_then(|room| room.trim().parse().ok())),
     agent: line.agent.or_else(|| ground::variable("BMO_TURN_AGENT")),
     via: via.map(str::to_owned).or_else(|| ground::variable("BMO_TURN_VIA")),
+    max_seconds: line.max_seconds.unwrap_or(DEFAULT_MAX_SECONDS),
     started_at: record::now(),
   };
 
@@ -141,7 +180,7 @@ fn started(root: &Path, request: &Request) -> ExitCode {
   };
   let exe = std::env::current_exe().unwrap_or_else(|_| "bmo".into());
   let started = Command::new("systemd-run")
-    .args(unit_line(&request.unit, &request.id, root, &exe))
+    .args(unit_line(request, root, &exe))
     .stdin(Stdio::null())
     .status();
 
@@ -164,11 +203,23 @@ fn started(root: &Path, request: &Request) -> ExitCode {
   }
 }
 
-/// The words `systemd-run` is given to start a kept call: the unit, each variable the run reads, and the same
-/// binary as `use --run <id>`.
-pub fn unit_line(unit: &str, id: &str, root: &Path, exe: &Path) -> Vec<OsString> {
-  let mut words: Vec<OsString> =
-    vec!["--user".into(), format!("--unit={unit}").into(), "--collect".into(), "--quiet".into()];
+/// The words `systemd-run` is given to start a kept call: the unit, its longest run, its last word, each
+/// variable the run reads, and the same binary as `use --run <id>`.
+pub fn unit_line(request: &Request, root: &Path, exe: &Path) -> Vec<OsString> {
+  let id = &request.id;
+  let mut words: Vec<OsString> = vec![
+    "--user".into(),
+    format!("--unit={}", request.unit).into(),
+    "--collect".into(),
+    "--quiet".into(),
+    format!("--property=RuntimeMaxSec={}", request.max_seconds).into(),
+  ];
+  let mut last_word = OsString::from("--property=ExecStopPost=");
+
+  last_word.push(exe);
+  last_word.push(format!(" use --ended {id}"));
+  words.push(last_word);
+
   let mut data_root = OsString::from("--setenv=BMO_DATA_DIR=");
 
   data_root.push(root);
@@ -209,7 +260,46 @@ fn ran(root: &Path, id: &str) -> ExitCode {
     eprintln!("bmo: the answer of `{id}` could not be kept: {why}");
   }
 
-  let woken = wake::send(root, &wake::body(&request, state, &answer_path, &summary));
+  finish(root, &request, state, summary)
+}
+
+// A kept call whose unit stopped: nothing where its run kept its end; otherwise the failure kept, as the answer
+// where none stands, and the agent woken with it.
+fn ended(root: &Path, id: &str) -> ExitCode {
+  let Some((request, end)) = record::of(root, id) else {
+    return unread(&format!("no record of `{id}` stands"));
+  };
+
+  if end.is_some() {
+    return ExitCode::SUCCESS;
+  }
+
+  let why = format!("its unit stopped before the call ended ({})", how_stopped());
+  let answer_path = record::place(root, id).join(record::ANSWER);
+
+  if !answer_path.exists()
+    && let Err(kept) = record::keep(&answer_path, &json!({ "code": "failed", "error": why }))
+  {
+    eprintln!("bmo: the answer of `{id}` could not be kept: {kept}");
+  }
+
+  let summary = wake::failure_summary(&request.tool, &why);
+
+  finish(root, &request, "failed", summary)
+}
+
+// How the unit stopped, as systemd hands its last word: the service result, the exit code and the exit status.
+fn how_stopped() -> String {
+  let said = |name: &str| ground::variable(name).unwrap_or_else(|| "unknown".to_owned());
+
+  format!("result {}, exit {} {}", said("SERVICE_RESULT"), said("EXIT_CODE"), said("EXIT_STATUS"))
+}
+
+// A kept call ended as `state`: the agent woken, then the end kept with the wake's outcome.
+fn finish(root: &Path, request: &Request, state: &str, summary: String) -> ExitCode {
+  let id = &request.id;
+  let place = record::place(root, id);
+  let woken = wake::send(root, &wake::body(request, state, &place.join(record::ANSWER), &summary));
   let end = End {
     ended_at: record::now(),
     state: state.to_owned(),
@@ -231,6 +321,33 @@ fn ran(root: &Path, id: &str) -> ExitCode {
 
       ExitCode::from(1)
     }
+  }
+}
+
+// The tools the toolbook lists, one a line: the full name, the proxy reaching it and its first sentence.
+fn tools(root: &Path, query: Option<&str>) -> ExitCode {
+  let book = match Toolbook::found(root) {
+    Ok(book) => book,
+    Err(why) => return unread(&why),
+  };
+
+  match book.list(query) {
+    Ok(listed) if listed.is_empty() => {
+      eprintln!(
+        "bmo: use: no tool is listed{}",
+        query.map(|query| format!(" for `{query}`")).unwrap_or_default()
+      );
+
+      ExitCode::SUCCESS
+    }
+    Ok(listed) => {
+      for item in listed {
+        println!("{}  {}  {}", item.tool, item.reached_by, item.summary);
+      }
+
+      ExitCode::SUCCESS
+    }
+    Err(refusal) => refused("list", &refusal),
   }
 }
 

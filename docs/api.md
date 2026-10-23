@@ -1,6 +1,6 @@
 # The fixed API: how `bmo` finds a unit's command and hands it on
 
-**고정됨 1.1.0.**
+**고정됨 1.2.0.**
 
 `bmo` holds no API and runs no service. It reads the words it is given, finds the unit command that carries
 them, and hands them on; what it answers itself is the help, the version, a refusal and its one verb, `use`,
@@ -104,14 +104,17 @@ handed whole to the operations machine, and what comes back is the run's own.
 ## The tool verb
 
 `bmo use` reaches one hosted tool: it asks the tool host's toolbook what the tool is, calls it, and answers what
-it said, either at once or, started as a unit of its own, by waking the asking agent once it is done. The tool
-host's own documents state the toolbook and the tools face; the receiver's state the instruction route. `use`
-calls each across that published contract and reads nothing else of theirs.
+it said, either at once or, started as a unit of its own, by waking the asking agent once it is done. It also lists
+the tools it reaches and describes one, so a caller finds a tool and reads how to fill its arguments through `use`
+alone. The tool host's own documents state the toolbook and the tools face; the receiver's state the instruction
+route. `use` calls each across that published contract and reads nothing else of theirs.
 
 | Asked | What it does |
 |---|---|
 | `bmo use <tool> [--sync] [--arg <key>=<value>]… [--json <object>]` | calls the tool and waits for its answer |
-| `bmo use <tool> --async [--memory <words>] [--room <room>] [--agent <name>] [--arg …]… [--json …]` | starts the call as a unit of its own and answers its id |
+| `bmo use <tool> --async [--memory <words>] [--room <room>] [--agent <name>] [--max-seconds <n>] [--arg …]… [--json …]` | starts the call as a unit of its own and answers its id |
+| `bmo use --tools [--query <words>]` | the tools `use` reaches, one a line |
+| `bmo use <tool> --describe` | the tool as the host describes it, as JSON |
 | `bmo use --list` | every record kept, one a line |
 | `bmo use --status <id>` | one record, as JSON |
 | `bmo use --help` | the verb's usage |
@@ -125,8 +128,22 @@ calls each across that published contract and reads nothing else of theirs.
 - **The token is the caller's own tool session's,** `BMO_MCP_TOKEN`, so the call is made under the caller's own
   record, its capabilities and grants. Where none is set, `use` says so and ends with 2.
 - **The data root** is `BMO_DATA_DIR`, else `.local/share/bmo/data` in the home directory.
-- **The tool is resolved first with `describe`,** whose answer names which of `call` and `act` reaches it and
-  carries its input schema. A tool that only reads is called with `call`, one that acts with `act`.
+- **The tool is resolved first with `describe`,** read by its structured content alone: `reachedBy` names which of
+  `call` and `act` reaches it and `input` is its input schema. A tool that only reads is called with `call`, one
+  that acts with `act`.
+
+### Finding a tool
+
+- **`--tools` asks the toolbook's `list`,** with `query` where `--query` names words, and writes each item of its
+  structured content one a line: the tool's full name, `call` or `act`, and the first sentence of its description,
+  separated by two spaces. These are the tools the caller's session reaches through the toolbook rather than by
+  their own names, as the tool host states it; a tool the session is shown by its own name is called through `use`
+  as well, by its full name. Where none is listed, `use` says so on standard error and ends with 0. A refusal of
+  the list is said as a call's is (「The answer」), the tool named `list`.
+- **`<tool> --describe` asks the toolbook's `describe`** and writes its structured content as one JSON object: the
+  tool in the shape the tool host answers a tool in, whose `description`, `manual`, `input`, `output`, `hints` and
+  `reachedBy` say what it does, how its arguments are filled and which of `call` and `act` reaches it. An unknown
+  tool is refused as a call of it is.
 
 ### The arguments
 
@@ -146,9 +163,9 @@ calls each across that published contract and reads nothing else of theirs.
   - a tool answer marked failed, the toolbook's refusal of an unknown tool or of a `call` of a tool that acts
     among them, by the code `refused` and the answer's text;
   - a host out of reach, by the code `unreachable`;
-  - a `describe` answer that names neither `call` nor `act`, by the code `unread`.
-- **Exit codes:** 0 where the tool answered, 1 where the call was refused, 2 where the words or the token could
-  not be read.
+  - a `describe` or `list` answer without the structured content stated above, by the code `unread`.
+- **Exit codes:** 0 where the tool, or the toolbook asked by `--tools` or `--describe`, answered, 1 where the call
+  was refused, 2 where the words or the token could not be read.
 
 ### Asynchronous: a unit of its own
 
@@ -158,20 +175,37 @@ calls each across that published contract and reads nothing else of theirs.
 - **A unit that cannot be started** is said on standard error, its record is taken back, and `use` ends with 1.
 - **The id** is the tool's namespace and name joined by `-`, every character but a letter, a digit, `_` and `-`
   made `-`, then `-` and eight hexadecimal digits drawn afresh. The unit is `bmo-use-<id>`.
-- **The unit** is started with `systemd-run --user --unit=bmo-use-<id> --collect --quiet`, each variable below
-  set with `--setenv`, and runs the same `bmo` binary as `use --run <id>`, a word for the unit alone. It is handed
-  `BMO_DATA_DIR`, the data root resolved, and, by name from the caller's environment where they are set,
-  `BMO_MCP_TOKEN`, `BMO_MCP_HOST_PORT`, `RECEIVER_ADDRESS` and `RECEIVER_TOKEN`; no token stands on its command
-  line.
+- **The unit** is started with `systemd-run --user --unit=bmo-use-<id> --collect --quiet`, then its longest run
+  as `--property=RuntimeMaxSec=<n>`, its last word as `--property=ExecStopPost=<bmo> use --ended <id>`, each
+  variable below set with `--setenv`, and runs the same `bmo` binary as `use --run <id>`; `--run` and `--ended`
+  are words for the unit alone. It is handed `BMO_DATA_DIR`, the data root resolved, and, by name from the caller's
+  environment where they are set, `BMO_MCP_TOKEN`, `BMO_MCP_HOST_PORT`, `RECEIVER_ADDRESS` and `RECEIVER_TOKEN`;
+  no token stands on its command line.
+- **Its longest run** is `--max-seconds <n>` seconds, a positive whole number, else 86400, one day. A unit still
+  running then is stopped, and its last word wakes the agent with the failure.
 - **The record is a folder,** `use/<id>/` under the data root, readable by the user alone:
   - `request.json`, written before the unit starts: `id`, `tool`, `reachedBy` (`call` or `act`), `arguments`,
-    `memory`, `room`, `agent`, `via`, `unit` and `startedAt`;
-  - `answer.json`, once the call ends: the tool's result as the host answered it, or the refusal as
+    `memory`, `room`, `agent`, `via`, `unit`, `maxSeconds` and `startedAt`;
+  - `answer.json`, once the call ends: the tool's result as the host answered it, or the refusal or the failure as
     `{code, error}`;
-  - `end.json`, last: `endedAt`, `state` (`done` or `refused`), `summary`, and `wake`, the instruction's `id`
-    where the receiver queued it or `error` where it did not.
+  - `end.json`, last: `endedAt`, `state` (`done`, `refused` or `failed`), `summary`, and `wake`, the instruction's
+    `id` where the receiver queued it or `error` where it did not.
 - **The run calls the tool as a synchronous call does,** through the proxy the request names; a run with no
   token is refused by the code `unauthorized`. A refusal is its answer and ends it as `refused`.
+- **The unit's last word, `use --ended <id>`,** runs whenever the unit stops, however it stopped. Where the run
+  kept its end, it does nothing. Where it did not, the run died before it ended: stopped at its longest run, killed,
+  or failed outside the call. The last word then keeps the failure as the answer, `{code: "failed", error}`, where
+  no answer stands, keeps the end as `failed`, and wakes the agent with it as a run's end does, so no agent is left
+  waiting on a unit that is gone. Its `error` names how the unit ended, by the service result, exit code and exit
+  status systemd hands it.
+- **The token a unit carries is the caller's, as it stood when `use --async` was asked.** `use` issues none and
+  refreshes none, and keeps none on disk. The host checks it when the call reaches it, and what the record's tools
+  keep for a call ends with the record, so the token must stand for the unit's whole run, which is at most its
+  longest run. A tool session issued with an expiry lapses then; one issued without stands until its issuer
+  revokes it, as an issuer does when the program carrying it is replaced. An issuer that hands a session `use`
+  therefore issues its token to outlast the longest run, or stands it until it is revoked; a unit whose token
+  lapsed or was revoked first is refused by the code `unauthorized`, or dies under its call and ends as `failed`,
+  and the agent is woken with either.
 - **`--memory <words>`** is what the caller wants handed back with the answer: what it was waiting for and what it
   meant to do next. It is kept in the record and carried in the wake.
 - **Whom the wake is for:** the room `--room` names, else `BMO_TURN_CHAT`; the agent `--agent` names, else
@@ -188,9 +222,10 @@ calls each across that published contract and reads nothing else of theirs.
   - `said.fact`: `use`, the id; `tool`; `state`; `answer`, the path of `answer.json`; `summary`; and `memory`;
   - `sort` `use-ended` and `summary`, the one-line summary;
   - no `kind`, so no wake replaces another, and no expiry, events, ride or run.
-- **The summary** is one line: ``<tool> answered: <first line of its first text>`` or ``<tool> was refused:
-  <code>: <why>``, cut to 160 characters.
-- **A wake the receiver refuses or does not answer** is kept in `end.json` as its `error`, and the unit ends with 1.
+- **The summary** is one line: ``<tool> answered: <first line of its first text>``, ``<tool> was refused:
+  <code>: <why>`` or ``<tool> failed: <why>``, cut to 160 characters.
+- **A wake the receiver refuses or does not answer** is kept in `end.json` as its `error`, and the unit ends with 1;
+  its end is kept, so the last word does not wake again.
 
 ### Reading the records
 
@@ -200,6 +235,17 @@ calls each across that published contract and reads nothing else of theirs.
   ended, `endedAt`, `summary`, `answer` (the path of `answer.json`) and `wake`. An id with no record ends with 2.
 - **A record's state** is its end's where `end.json` stands; else `running` while its unit is active, and `lost`
   once it is not, as where the machine restarted under it.
+
+## Where `bmo` stands
+
+- **Every deployment links `bmo` into `.local/bin` under the home directory,** before the flip, making the folder
+  where it does not stand and replacing whatever stood under that name. The link names the deploy tree's own link,
+  `.local/share/bmo-cli/deploy/bin/bmo`, which stands across releases, so it names whichever release is live and
+  never dangles once an older one is pruned.
+- **A program finds `bmo` by its bare name where its `PATH` holds that folder,** a session's harness among them.
+  The deployment guarantees the link, not any program's `PATH`: a service that starts programs puts the folder on
+  the `PATH` it hands them, as its own documents state.
+- **A unit command another unit's deployment links beside `bmo`** is found there first (「The unit command」).
 
 ## What `bmo` does not hold
 

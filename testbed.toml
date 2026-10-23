@@ -22,3 +22,16 @@ binaries = ["bmo"]
 root = "~/.local/share/bmo-cli"
 data_root = "~/.local/share/bmo-cli/data"
 units = []
+
+# The binary, linked into `.local/bin` under the home directory, where every program whose `PATH` holds that
+# folder finds `bmo` by its bare name and every unit command linked beside it (docs/api.md, "Where `bmo`
+# stands"). The link names this repository's deploy tree, whose own link stands across releases; a link made to
+# the release being deployed would dangle once a later deployment prunes that release.
+[[deploy.step]]
+id = "link-command"
+phase = "before-flip"
+command = '''
+set -eu
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$HOME/.local/share/bmo-cli/deploy/bin/bmo" "$HOME/.local/bin/bmo"
+'''
