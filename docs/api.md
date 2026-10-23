@@ -1,6 +1,6 @@
 # The fixed API: how `bmo` finds a unit's command and hands it on
 
-**고정됨 1.2.1.**
+**Fixed 1.2.1.**
 
 `bmo` holds no API and runs no service. It reads the words it is given, finds the unit command that carries
 them, and hands them on; what it answers itself is the help, the version, a refusal and its one verb, `use`,
