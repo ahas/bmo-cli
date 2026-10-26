@@ -1,7 +1,5 @@
 # The fixed API: how `bmo` finds a unit's command and hands it on
 
-**Fixed 1.2.1.**
-
 `bmo` holds no API and runs no service. It reads the words it is given, finds the unit command that carries
 them, and hands them on; what it answers itself is the help, the version, a refusal and its one verb, `use`,
 which reaches a hosted tool. This document is the whole of that contract: the command-finding rule, the
@@ -275,8 +273,6 @@ route. `use` calls each across that published contract and reads nothing else of
 
 ## Versioning
 
-- **The contract carries the repository's one version, in semver,** the version in `VERSION` and the Cargo
-  manifest.
-- **The major moves on a change a caller or a unit reads:** the resolution order, the reading of `nouns`, the
-  placing of `--via`, an exit code, or an answer's words. The minor moves on an addition: a mark `bmo`
-  understands, an option of `bmo` or of its verb, a verb of its own. The patch moves on anything else.
+- **The contract carries the repository's one version,** the version in `VERSION` and the Cargo manifest. It
+  moves only at a release the owner declares, as bmo-chat's `docs/conventions.md` 「Versions」 states; a
+  contract change moves none, and a deployment is told apart by its commit.

@@ -53,7 +53,7 @@ A change is not done before stage 3 has passed.
 
 ## Releasing
 
-- The version stands in `VERSION` and in the Cargo manifest, the same in both, in semver. The major
-  moves on a change a caller reads: the resolution order, the `nouns` reading or the exit codes. The
-  minor moves on an addition; the patch on anything else.
+- The version stands in `VERSION` and in the Cargo manifest, the same in both. It moves only at a release
+  the owner declares, as bmo-chat's `docs/conventions.md` 「Versions」 states; a commit, a deploy, a fix or a
+  contract change moves none, and a deployment is told apart by its commit.
 - bmo-testbed builds and deploys this repository by `testbed.toml`.
