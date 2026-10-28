@@ -490,7 +490,7 @@ fn refused_write(why: &str, records: &Path) -> String {
   let workspace = std::env::current_dir().unwrap_or_default();
 
   format!(
-    "{why} — the shell's file sandbox allows its workspace only ({}), and the record was to stand in {}",
+    "{why}; the shell's file sandbox allows its workspace only ({}), and the record was to stand in {}",
     workspace.display(),
     records.display()
   )
