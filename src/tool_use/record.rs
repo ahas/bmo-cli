@@ -1,5 +1,5 @@
-//! The records of asynchronous calls: one folder each under the data root's `use/`, holding the request, the
-//! answer and the end (docs/api.md, 「The tool verb」).
+//! The records of asynchronous calls a shell keeps itself, and the folders the tool host keeps its own under: one
+//! folder each, holding the request, the answer and the end (docs/api.md, 「The tool verb」).
 
 use std::fs::DirBuilder;
 use std::hash::{BuildHasher as _, RandomState};
@@ -48,14 +48,38 @@ pub struct End {
   pub wake: Value,
 }
 
-/// The folder every record stands in.
+/// The folder every record stands in, under the data root: what an older caller keeps, and what the host keeps.
 pub fn folder(root: &Path) -> PathBuf {
   root.join("use")
 }
 
-/// One record's folder.
-pub fn place(root: &Path, id: &str) -> PathBuf {
-  folder(root).join(id)
+/// The folder the calls this shell keeps stand in: `BMO_USE_RECORD_DIR` where it names one, else the workspace's
+/// own `.bmo/use` where it stands, else the data root's `use`. A shell sandboxed to its workspace writes only the
+/// second.
+pub fn records(root: &Path) -> PathBuf {
+  if let Some(named) = super::ground::variable("BMO_USE_RECORD_DIR") {
+    return PathBuf::from(named);
+  }
+
+  let workspace = workspace();
+
+  if workspace.is_dir() { workspace } else { folder(root) }
+}
+
+/// The folder a call this shell keeps itself stands in: `BMO_USE_RECORD_DIR` where it names one, else `.bmo/use` in
+/// the workspace the command runs in, the one place a shell sandboxed to it may write.
+pub fn workspace_records() -> PathBuf {
+  super::ground::variable("BMO_USE_RECORD_DIR").map_or_else(workspace, PathBuf::from)
+}
+
+// `.bmo/use` in the directory the command runs in.
+fn workspace() -> PathBuf {
+  std::env::current_dir().unwrap_or_default().join(".bmo/use")
+}
+
+/// One record's folder, inside `records`.
+pub fn place(records: &Path, id: &str) -> PathBuf {
+  records.join(id)
 }
 
 /// A fresh id for a call of `tool`: its namespace and name joined by `-`, then eight hexadecimal digits.
@@ -84,13 +108,13 @@ pub fn now() -> i64 {
 }
 
 /// The record of `request` made, readable by the user alone, its request kept.
-pub fn create(root: &Path, request: &Request) -> Result<PathBuf, String> {
-  let place = place(root, &request.id);
+pub fn create(records: &Path, request: &Request) -> Result<PathBuf, String> {
+  let place = place(records, &request.id);
 
   DirBuilder::new()
     .recursive(true)
     .mode(0o700)
-    .create(folder(root))
+    .create(records)
     .and_then(|()| DirBuilder::new().mode(0o700).create(&place))
     .map_err(|why| format!("{}: {why}", place.display()))?;
   keep(&place.join(REQUEST), request)?;
@@ -120,12 +144,12 @@ pub fn read<T: for<'de> Deserialize<'de>>(path: &Path) -> Option<T> {
 }
 
 /// A record's request and its end, where it has one.
-pub fn of(root: &Path, id: &str) -> Option<(Request, Option<End>)> {
+pub fn of(records: &Path, id: &str) -> Option<(Request, Option<End>)> {
   if !readable_id(id) {
     return None;
   }
 
-  let place = place(root, id);
+  let place = place(records, id);
 
   Some((read(&place.join(REQUEST))?, read(&place.join(END))))
 }
@@ -151,14 +175,14 @@ fn active(unit: &str) -> bool {
 }
 
 /// Every record kept, oldest first.
-pub fn every(root: &Path) -> Vec<(Request, Option<End>)> {
-  let mut records: Vec<(Request, Option<End>)> = std::fs::read_dir(folder(root))
+pub fn every(records: &Path) -> Vec<(Request, Option<End>)> {
+  let mut found: Vec<(Request, Option<End>)> = std::fs::read_dir(records)
     .into_iter()
     .flatten()
     .filter_map(Result::ok)
-    .filter_map(|entry| of(root, entry.file_name().to_str()?))
+    .filter_map(|entry| of(records, entry.file_name().to_str()?))
     .collect();
 
-  records.sort_by(|(one, _), (other, _)| (one.started_at, &one.id).cmp(&(other.started_at, &other.id)));
-  records
+  found.sort_by(|(one, _), (other, _)| (one.started_at, &one.id).cmp(&(other.started_at, &other.id)));
+  found
 }

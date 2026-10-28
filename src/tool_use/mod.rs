@@ -1,7 +1,8 @@
 //! The tool verb, `bmo use`: one hosted tool reached through the tool host's toolbook, its answer printed at
-//! once or, started as a unit of its own, kept and handed to the agent by a wake (docs/api.md, 「The tool
+//! once or, asked of the tool host to run beyond the request, handed to the agent by a wake (docs/api.md, 「The tool
 //! verb」).
 
+pub mod calls;
 pub mod ground;
 pub mod record;
 pub mod toolbook;
@@ -92,21 +93,22 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
     Err(why) => why.exit(),
   };
   let root = ground::data_root();
+  let records = record::records(&root);
 
   if line.list {
-    return listed(&root);
+    return listed(&root, &records);
   }
 
   if let Some(id) = &line.status {
-    return status(&root, id);
+    return status(&root, &records, id);
   }
 
   if let Some(id) = &line.run {
-    return ran(&root, id);
+    return ran(&root, &records, id);
   }
 
   if let Some(id) = &line.ended {
-    return ended(&root, id);
+    return ended(&root, &records, id);
   }
 
   if line.tools {
@@ -165,22 +167,60 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
     started_at: record::now(),
   };
 
-  started(&root, &request)
+  asked_of(&request, &root)
 }
 
-// A kept request started as its own unit, its id, unit and folder answered.
-fn started(root: &Path, request: &Request) -> ExitCode {
-  let place = match record::create(root, request) {
+// A call asked: the tool host keeps and runs it where its calls face answers; a host that serves none, or cannot be
+// asked, leaves the caller to keep it in its own workspace.
+fn asked_of(request: &Request, root: &Path) -> ExitCode {
+  let asked = json!({
+    "tool": request.tool,
+    "arguments": &request.arguments,
+    "memory": &request.memory,
+    "room": request.room,
+    "agent": &request.agent,
+    "via": &request.via,
+    "maxSeconds": request.max_seconds,
+  });
+
+  if let Some(calls) = calls::Calls::found(root) {
+    match calls.served() {
+      Ok(true) => {
+        return match calls.start(&asked) {
+          Ok(answer) => {
+            println!("{}", serde_json::to_string_pretty(&answer).unwrap_or_default());
+
+            ExitCode::SUCCESS
+          }
+          Err(why) => not_started(&request.tool, &why),
+        };
+      }
+      Ok(false) => {}
+      Err(why) => return not_started(&request.tool, &why),
+    }
+  }
+
+  started(root, &record::workspace_records(), request)
+}
+
+// A kept request started as its own unit, its id, unit and folder answered: the road of a shell whose host serves
+// no calls face, the record standing in the caller's workspace and the wake naming it there.
+fn started(root: &Path, records: &Path, request: &Request) -> ExitCode {
+  let place = match record::create(records, request) {
     Ok(place) => place,
     Err(why) => {
-      eprintln!("bmo: the record of `{}` could not be kept: {why}", request.tool);
+      eprintln!(
+        "bmo: the record of `{}` could not be kept: {}",
+        request.tool,
+        refused_write(&why, records)
+      );
 
       return ExitCode::from(1);
     }
   };
   let exe = std::env::current_exe().unwrap_or_else(|_| "bmo".into());
   let started = Command::new("systemd-run")
-    .args(unit_line(request, root, &exe))
+    .args(unit_line(request, root, records, &exe))
     .stdin(Stdio::null())
     .status();
 
@@ -205,7 +245,7 @@ fn started(root: &Path, request: &Request) -> ExitCode {
 
 /// The words `systemd-run` is given to start a kept call: the unit, its longest run, its last word, each
 /// variable the run reads, and the same binary as `use --run <id>`.
-pub fn unit_line(request: &Request, root: &Path, exe: &Path) -> Vec<OsString> {
+pub fn unit_line(request: &Request, root: &Path, records: &Path, exe: &Path) -> Vec<OsString> {
   let id = &request.id;
   let mut words: Vec<OsString> = vec![
     "--user".into(),
@@ -225,6 +265,11 @@ pub fn unit_line(request: &Request, root: &Path, exe: &Path) -> Vec<OsString> {
   data_root.push(root);
   words.push(data_root);
 
+  let mut record_dir = OsString::from("--setenv=BMO_USE_RECORD_DIR=");
+
+  record_dir.push(records);
+  words.push(record_dir);
+
   for name in ["BMO_MCP_TOKEN", "BMO_MCP_HOST_PORT", "RECEIVER_ADDRESS", "RECEIVER_TOKEN"] {
     if ground::variable(name).is_some() {
       words.push(format!("--setenv={name}").into());
@@ -236,11 +281,11 @@ pub fn unit_line(request: &Request, root: &Path, exe: &Path) -> Vec<OsString> {
 }
 
 // A kept call run: the answer and the end kept, then the agent woken.
-fn ran(root: &Path, id: &str) -> ExitCode {
-  let Some((request, _)) = record::of(root, id) else {
+fn ran(root: &Path, records: &Path, id: &str) -> ExitCode {
+  let Some((request, _)) = record::of(records, id) else {
     return unread(&format!("no record of `{id}` stands"));
   };
-  let place = record::place(root, id);
+  let place = record::place(records, id);
   let outcome = Toolbook::found(root)
     .map_err(|why| Refusal {
       code: "unauthorized".to_owned(),
@@ -260,13 +305,13 @@ fn ran(root: &Path, id: &str) -> ExitCode {
     eprintln!("bmo: the answer of `{id}` could not be kept: {why}");
   }
 
-  finish(root, &request, state, summary)
+  finish(root, records, &request, state, summary)
 }
 
 // A kept call whose unit stopped: nothing where its run kept its end; otherwise the failure kept, as the answer
 // where none stands, and the agent woken with it.
-fn ended(root: &Path, id: &str) -> ExitCode {
-  let Some((request, end)) = record::of(root, id) else {
+fn ended(root: &Path, records: &Path, id: &str) -> ExitCode {
+  let Some((request, end)) = record::of(records, id) else {
     return unread(&format!("no record of `{id}` stands"));
   };
 
@@ -275,7 +320,7 @@ fn ended(root: &Path, id: &str) -> ExitCode {
   }
 
   let why = format!("its unit stopped before the call ended ({})", how_stopped());
-  let answer_path = record::place(root, id).join(record::ANSWER);
+  let answer_path = record::place(records, id).join(record::ANSWER);
 
   if !answer_path.exists()
     && let Err(kept) = record::keep(&answer_path, &json!({ "code": "failed", "error": why }))
@@ -285,7 +330,7 @@ fn ended(root: &Path, id: &str) -> ExitCode {
 
   let summary = wake::failure_summary(&request.tool, &why);
 
-  finish(root, &request, "failed", summary)
+  finish(root, records, &request, "failed", summary)
 }
 
 // How the unit stopped, as systemd hands its last word: the service result, the exit code and the exit status.
@@ -296,9 +341,9 @@ fn how_stopped() -> String {
 }
 
 // A kept call ended as `state`: the agent woken, then the end kept with the wake's outcome.
-fn finish(root: &Path, request: &Request, state: &str, summary: String) -> ExitCode {
+fn finish(root: &Path, records: &Path, request: &Request, state: &str, summary: String) -> ExitCode {
   let id = &request.id;
-  let place = record::place(root, id);
+  let place = record::place(records, id);
   let woken = wake::send(root, &wake::body(request, state, &place.join(record::ANSWER), &summary));
   let end = End {
     ended_at: record::now(),
@@ -351,18 +396,60 @@ fn tools(root: &Path, query: Option<&str>) -> ExitCode {
   }
 }
 
-// Every record, one a line: its id, its state and its tool.
-fn listed(root: &Path) -> ExitCode {
-  for (request, end) in record::every(root) {
+// Every record, one a line: its id, its state and its tool. The host's records are asked for where its calls face
+// answers; the shell's own are read where it does not.
+fn listed(root: &Path, records: &Path) -> ExitCode {
+  if let Some(calls) = calls::Calls::found(root) {
+    match calls.served() {
+      Ok(true) => {
+        return match calls.list() {
+          Ok(answer) => {
+            for call in answer["items"].as_array().into_iter().flatten() {
+              println!(
+                "{}  {}  {}",
+                call["id"].as_str().unwrap_or_default(),
+                call["state"].as_str().unwrap_or_default(),
+                call["tool"].as_str().unwrap_or_default()
+              );
+            }
+
+            ExitCode::SUCCESS
+          }
+          Err(why) => unread(&why),
+        };
+      }
+      Ok(false) => {}
+      Err(why) => return unread(&why),
+    }
+  }
+
+  for (request, end) in record::every(records) {
     println!("{}  {}  {}", request.id, record::state(&request, end.as_ref()), request.tool);
   }
 
   ExitCode::SUCCESS
 }
 
-// One record as JSON.
-fn status(root: &Path, id: &str) -> ExitCode {
-  let Some((request, end)) = record::of(root, id) else {
+// One record as JSON: the host's where its calls face answers, else the one this shell kept.
+fn status(root: &Path, records: &Path, id: &str) -> ExitCode {
+  if let Some(calls) = calls::Calls::found(root) {
+    match calls.served() {
+      Ok(true) => {
+        return match calls.one(id) {
+          Ok(record) => {
+            println!("{}", serde_json::to_string_pretty(&record).unwrap_or_default());
+
+            ExitCode::SUCCESS
+          }
+          Err(why) => unread(&why),
+        };
+      }
+      Ok(false) => {}
+      Err(why) => return unread(&why),
+    }
+  }
+
+  let Some((request, end)) = record::of(records, id) else {
     return unread(&format!("no record of `{id}` stands"));
   };
   let state = record::state(&request, end.as_ref());
@@ -373,13 +460,40 @@ fn status(root: &Path, id: &str) -> ExitCode {
   if let Some(end) = end {
     answer["endedAt"] = json!(end.ended_at);
     answer["summary"] = json!(end.summary);
-    answer["answer"] = json!(record::place(root, id).join(record::ANSWER).display().to_string());
+    answer["answer"] = json!(record::place(records, id).join(record::ANSWER).display().to_string());
     answer["wake"] = end.wake;
   }
 
   println!("{}", serde_json::to_string_pretty(&answer).unwrap_or_default());
 
   ExitCode::SUCCESS
+}
+
+// A call that could not be started, and why.
+fn not_started(tool: &str, why: &str) -> ExitCode {
+  eprintln!("bmo: `{tool}` could not be started: {why}");
+
+  ExitCode::from(1)
+}
+
+// A write the shell refused, said with what refused it: a shell sandboxed to its workspace allows no path outside
+// it, so the error names the sandbox and the workspace a call's record must stand in.
+fn refused_write(why: &str, records: &Path) -> String {
+  let sandboxed = ["Permission denied", "Read-only file system", "Operation not permitted"]
+    .iter()
+    .any(|said| why.contains(said));
+
+  if !sandboxed {
+    return why.to_owned();
+  }
+
+  let workspace = std::env::current_dir().unwrap_or_default();
+
+  format!(
+    "{why} — the shell's file sandbox allows its workspace only ({}), and the record was to stand in {}",
+    workspace.display(),
+    records.display()
+  )
 }
 
 // A call refused, by its code and why.

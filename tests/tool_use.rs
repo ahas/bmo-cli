@@ -4,6 +4,7 @@
 
 mod support;
 
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
@@ -12,30 +13,50 @@ use support::stand_ins::{self, INSTRUCTION, RECEIVER_TOKEN, SESSION_TOKEN, Stand
 use support::{Bench, errors, lines};
 
 // A bench whose `PATH` holds a `systemd-run` keeping the words it was given and a `systemctl` saying no unit
-// is active, with a stand-in tool host and receiver.
+// is active, with a stand-in tool host and receiver, and a workspace the caller runs in.
 struct Stage {
   bench: Bench,
   host: StandIn,
   receiver: StandIn,
+  workspace: PathBuf,
 }
 
 impl Stage {
+  // A host that serves no calls face, as a host older than the face does: a call asked of it is kept by the
+  // caller itself, in its workspace.
   fn new() -> Self {
+    Self::standing(stand_ins::tool_host())
+  }
+
+  // A host whose calls face answers, as the deployment's own does: the host keeps every call asked of it.
+  fn with_calls() -> Self {
+    Self::standing(stand_ins::tool_host_with_calls())
+  }
+
+  fn standing(host: StandIn) -> Self {
     let bench = Bench::new();
     let started = bench.path().join("systemd-run.words");
+    let workspace = bench.path().join("workspace");
 
+    std::fs::create_dir(&workspace).unwrap();
     bench.command("systemd-run", &format!("printf '%s\\n' \"$@\" > '{}'", started.display()));
     bench.command("systemctl", "exit 3");
 
     Self {
       bench,
-      host: stand_ins::tool_host(),
+      host,
       receiver: stand_ins::receiver(),
+      workspace,
     }
   }
 
   fn root(&self) -> PathBuf {
     self.bench.path().join("data")
+  }
+
+  // The folder a caller's own records stand in, in its workspace.
+  fn records(&self) -> PathBuf {
+    self.workspace.join(".bmo/use")
   }
 
   // `bmo` run with `words` as a turn of agent-a in room -5 would run it.
@@ -48,19 +69,42 @@ impl Stage {
     let port = self.host.port.to_string();
     let receiver = self.receiver.address();
 
-    self.bench.bmo_given(
-      words,
-      "",
-      &[
+    let mut command = self.bench.bmo_command(words);
+
+    command.current_dir(&self.workspace).envs([
+      ("BMO_DATA_DIR", root.to_str().unwrap()),
+      ("BMO_MCP_TOKEN", token),
+      ("BMO_MCP_HOST_PORT", &port),
+      ("RECEIVER_ADDRESS", &receiver),
+      ("RECEIVER_TOKEN", RECEIVER_TOKEN),
+      ("BMO_TURN_CHAT", "-5"),
+      ("BMO_TURN_AGENT", "agent-a"),
+    ]);
+
+    support::run(command, None)
+  }
+
+  // `bmo` run with `words` and the variables `variables`, in the workspace.
+  fn bmo_env(&self, words: &[&str], variables: &[(&str, &str)]) -> Output {
+    let root = self.root();
+    let port = self.host.port.to_string();
+    let receiver = self.receiver.address();
+    let mut command = self.bench.bmo_command(words);
+
+    command
+      .current_dir(&self.workspace)
+      .envs([
         ("BMO_DATA_DIR", root.to_str().unwrap()),
-        ("BMO_MCP_TOKEN", token),
+        ("BMO_MCP_TOKEN", stand_ins::SESSION_TOKEN),
         ("BMO_MCP_HOST_PORT", &port),
         ("RECEIVER_ADDRESS", &receiver),
-        ("RECEIVER_TOKEN", RECEIVER_TOKEN),
+        ("RECEIVER_TOKEN", stand_ins::RECEIVER_TOKEN),
         ("BMO_TURN_CHAT", "-5"),
         ("BMO_TURN_AGENT", "agent-a"),
-      ],
-    )
+      ])
+      .envs(variables.iter().copied());
+
+    support::run(command, None)
   }
 
   // The toolbook tools the host was asked, with the inner tool each named.
@@ -69,6 +113,7 @@ impl Stage {
       .host
       .sent()
       .iter()
+      .filter(|sent| sent.path == "/mcp/toolbook")
       .map(|sent| {
         let params = &sent.body["params"];
 
@@ -231,7 +276,7 @@ fn use_is_bmos_own_word_whatever_a_unit_declares() {
 }
 
 #[test]
-fn an_async_start_keeps_the_record_and_starts_the_unit() {
+fn an_async_call_a_host_with_no_calls_face_keeps_in_the_workspace() {
   let stage = Stage::new();
 
   let output =
@@ -247,7 +292,7 @@ fn an_async_start_keeps_the_record_and_starts_the_unit() {
   assert!(nonce.len() == 8 && nonce.chars().all(|digit| digit.is_ascii_hexdigit()), "{id}");
   assert_eq!(answer["unit"], format!("bmo-use-{id}"));
 
-  let place = stage.root().join("use").join(id);
+  let place = stage.records().join(id);
 
   assert_eq!(answer["record"], place.display().to_string());
 
@@ -276,6 +321,7 @@ fn an_async_start_keeps_the_record_and_starts_the_unit() {
       "--property=RuntimeMaxSec=86400".to_owned(),
       format!("--property=ExecStopPost={exe} use --ended {id}"),
       format!("--setenv=BMO_DATA_DIR={}", stage.root().display()),
+      format!("--setenv=BMO_USE_RECORD_DIR={}", stage.records().display()),
       "--setenv=BMO_MCP_TOKEN".to_owned(),
       "--setenv=BMO_MCP_HOST_PORT".to_owned(),
       "--setenv=RECEIVER_ADDRESS".to_owned(),
@@ -294,13 +340,93 @@ fn an_async_start_keeps_the_record_and_starts_the_unit() {
 }
 
 #[test]
+fn an_async_call_is_asked_of_the_host_and_kept_there() {
+  let stage = Stage::with_calls();
+
+  let output = stage.bmo(&[
+    "use",
+    "web/read",
+    "--async",
+    "--memory",
+    "tell the owner",
+    "--arg",
+    "name=page",
+    "--max-seconds",
+    "90",
+  ]);
+
+  assert!(output.status.success(), "{}", errors(&output));
+
+  let answer: Value = serde_json::from_slice(&output.stdout).unwrap();
+  let id = answer["id"].as_str().unwrap();
+
+  assert_eq!(id, "web-read-00000007");
+  assert_eq!(answer["state"], json!("running"));
+  assert_eq!(answer["record"], json!(format!("/kept/use/{id}")));
+
+  let asked: Vec<_> = stage
+    .host
+    .sent()
+    .into_iter()
+    .filter(|sent| sent.method == "POST" && sent.path == "/use")
+    .collect();
+
+  assert_eq!(asked.len(), 1, "{asked:?}");
+  assert_eq!(asked[0].method, "POST");
+  assert_eq!(asked[0].body["tool"], json!("web/read"));
+  assert_eq!(asked[0].body["arguments"], json!({ "name": "page" }));
+  assert_eq!(asked[0].body["memory"], json!("tell the owner"));
+  assert_eq!(asked[0].body["room"], json!(-5));
+  assert_eq!(asked[0].body["agent"], json!("agent-a"));
+  assert_eq!(asked[0].body["maxSeconds"], json!(90));
+
+  // The caller's shell kept nothing: no record under the data root, nothing in its workspace, no unit started.
+  assert!(!stage.root().exists());
+  assert!(!stage.records().exists());
+  assert!(!stage.bench.path().join("systemd-run.words").exists());
+}
+
+#[test]
+fn a_status_and_a_list_ask_the_host_for_its_calls() {
+  let stage = Stage::with_calls();
+  let id = stage.started(&["use", "web/read", "--async", "--arg", "name=page"]);
+
+  let status: Value = serde_json::from_slice(&stage.bmo(&["use", "--status", &id]).stdout).unwrap();
+
+  assert_eq!(status["id"], json!(id));
+  assert_eq!(status["tool"], json!("web/read"));
+  assert_eq!(status["state"], json!("running"));
+  assert_eq!(lines(&stage.bmo(&["use", "--list"])), [format!("{id}  running  web/read")]);
+  assert!(!stage.records().exists());
+}
+
+#[test]
+fn a_refused_write_names_the_sandbox_and_the_workspace() {
+  let stage = Stage::new();
+  let refused = stage.bench.path().join("refused");
+  let records = refused.join("use");
+
+  std::fs::create_dir(&refused).unwrap();
+  std::fs::set_permissions(&refused, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+  let output =
+    stage.bmo_env(&["use", "web/read", "--async"], &[("BMO_USE_RECORD_DIR", records.to_str().unwrap())]);
+  let said = errors(&output);
+
+  assert_eq!(output.status.code(), Some(1), "{said}");
+  assert!(said.contains("sandbox"), "{said}");
+  assert!(said.contains(&stage.workspace.display().to_string()), "{said}");
+  assert!(said.contains(&records.display().to_string()), "{said}");
+}
+
+#[test]
 fn an_unknown_tool_is_refused_before_any_record_is_kept() {
   let stage = Stage::new();
 
   let output = stage.bmo(&["use", "web/nope", "--async"]);
 
   assert_eq!(output.status.code(), Some(1));
-  assert!(!stage.root().join("use").exists());
+  assert!(!stage.records().exists());
   assert!(!stage.bench.path().join("systemd-run.words").exists());
 }
 
@@ -313,7 +439,7 @@ fn a_run_keeps_the_answer_and_wakes_the_agent_with_its_path_and_summary() {
 
   assert!(run.status.success(), "{}", errors(&run));
 
-  let place = stage.root().join("use").join(&id);
+  let place = stage.records().join(&id);
   let answer = place.join("answer.json");
 
   assert_eq!(read(&answer)["content"][0]["text"], "read {}\nsecond line");
@@ -367,7 +493,7 @@ fn a_run_keeps_the_answer_and_wakes_the_agent_with_its_path_and_summary() {
 fn a_refused_run_wakes_the_agent_with_the_refusal() {
   let stage = Stage::new();
   let id = stage.started(&["use", "bmo/say", "--async", "--room", "42", "--agent", "agent-b"]);
-  let place = stage.root().join("use").join(&id);
+  let place = stage.records().join(&id);
   let mut request = read(&place.join("request.json"));
 
   request["tool"] = json!("bmo/gone");
@@ -396,6 +522,7 @@ fn a_wake_the_receiver_refuses_is_kept_and_ends_the_run_with_1() {
   let mut command = stage.bench.bmo_command(&["use", "--run", &id]);
 
   command
+    .current_dir(&stage.workspace)
     .env("BMO_DATA_DIR", stage.root())
     .env("BMO_MCP_TOKEN", SESSION_TOKEN)
     .env("BMO_MCP_HOST_PORT", stage.host.port.to_string())
@@ -406,7 +533,7 @@ fn a_wake_the_receiver_refuses_is_kept_and_ends_the_run_with_1() {
 
   assert_eq!(run.status.code(), Some(1));
 
-  let end = read(&stage.root().join("use").join(&id).join("end.json"));
+  let end = read(&stage.records().join(&id).join("end.json"));
 
   assert_eq!(end["state"], "done");
   assert!(end["wake"]["error"].as_str().unwrap().contains("unauthorized"), "{end}");
@@ -428,7 +555,10 @@ fn the_receiver_is_read_from_the_data_roots_env_file_where_the_environment_names
 
   let mut command = stage.bench.bmo_command(&["use", "--run", &id]);
 
-  command.env("BMO_DATA_DIR", stage.root()).env("BMO_MCP_TOKEN", SESSION_TOKEN);
+  command
+    .current_dir(&stage.workspace)
+    .env("BMO_DATA_DIR", stage.root())
+    .env("BMO_MCP_TOKEN", SESSION_TOKEN);
 
   let run = support::run(command, None);
 
@@ -498,7 +628,7 @@ fn a_longest_run_given_is_the_units_and_the_records() {
   let id = stage.started(&["use", "web/read", "--async", "--max-seconds", "90"]);
 
   assert!(stage.unit_words().contains(&"--property=RuntimeMaxSec=90".to_owned()));
-  assert_eq!(read(&stage.root().join("use").join(&id).join("request.json"))["maxSeconds"], 90);
+  assert_eq!(read(&stage.records().join(&id).join("request.json"))["maxSeconds"], 90);
   assert_eq!(stage.bmo(&["use", "web/read", "--async", "--max-seconds", "0"]).status.code(), Some(2));
   assert_eq!(stage.bmo(&["use", "web/read", "--max-seconds", "90"]).status.code(), Some(2));
 }
@@ -507,10 +637,11 @@ fn a_longest_run_given_is_the_units_and_the_records() {
 fn a_unit_that_stopped_before_its_end_wakes_the_agent_with_the_failure() {
   let stage = Stage::new();
   let id = stage.started(&["use", "web/read", "--async", "--memory", "tell the owner"]);
-  let place = stage.root().join("use").join(&id);
+  let place = stage.records().join(&id);
   let mut command = stage.bench.bmo_command(&["use", "--ended", &id]);
 
   command
+    .current_dir(&stage.workspace)
     .env("BMO_DATA_DIR", stage.root())
     .env("RECEIVER_ADDRESS", stage.receiver.address())
     .env("RECEIVER_TOKEN", RECEIVER_TOKEN)
@@ -542,10 +673,10 @@ fn a_units_last_word_after_its_end_does_nothing() {
 
   assert!(stage.bmo(&["use", "--run", &id]).status.success());
 
-  let end = read(&stage.root().join("use").join(&id).join("end.json"));
+  let end = read(&stage.records().join(&id).join("end.json"));
   let last_word = stage.bmo(&["use", "--ended", &id]);
 
   assert!(last_word.status.success(), "{}", errors(&last_word));
   assert_eq!(stage.receiver.sent().len(), 1);
-  assert_eq!(read(&stage.root().join("use").join(&id).join("end.json")), end);
+  assert_eq!(read(&stage.records().join(&id).join("end.json")), end);
 }

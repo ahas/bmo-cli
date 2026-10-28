@@ -8,7 +8,7 @@ use serde_json::{Map, Value, json};
 use super::ground;
 
 /// The tools face's port where neither the environment nor the data root names one.
-const DEFAULT_PORT: &str = "3290";
+pub const DEFAULT_PORT: &str = "3290";
 
 /// Why a call did not answer: a stable code and the sentence that goes with it.
 #[derive(Debug, Clone, PartialEq, Eq)]
