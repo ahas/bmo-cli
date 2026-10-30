@@ -47,7 +47,11 @@ The words `bmo` is given are read in this order, and the first rule that matches
 3. **The git rule.** Where the first word is `<name>` and a unit command `bmo-<name>` stands, `bmo` runs it
    with the words after the first: `bmo graph nodes` runs `bmo-graph nodes`. The unit's own answer stands, its
    refusal of words it does not carry included.
-4. **Not served.** Nothing above matched (「What `bmo` answers itself」).
+4. **Nothing matched.** Where the leading words begin one or more declared nouns without being one, `bmo`
+   names the longest run of them that does and lists every noun it begins, each with the unit command declaring
+   it: `bmo deploy`, `bmo deploy --help` and `bmo deploy foo` all list the nouns beginning with `deploy`. Where
+   no noun begins with the first word, the words are not served. Either way `bmo` ends with 2 (「What `bmo`
+   answers itself」).
 
 - **What is handed on unchanged:** the words, in their order; the environment; standard input, output and
   error; and the unit's exit code, which is `bmo`'s.
@@ -67,6 +71,7 @@ The words `bmo` is given are read in this order, and the first rule that matches
 | `bmo help`, `bmo --help`, `bmo -h` | the help, on standard output | 0 |
 | `bmo help <words>` | `<words> --help`, resolved and handed on as any command is | the unit's |
 | `bmo` with no words | the help, on standard error | 2 |
+| words beginning declared nouns without being one | ``bmo: `<begun>` is not a command of its own; the nouns beginning with it are:`` then each such noun on a line of its own, with the unit command declaring it, on standard error | 2 |
 | words nothing serves | ``bmo: `<words>` is not served yet: no installed unit carries it`` on standard error | 2 |
 | a noun two unit commands declare | ``bmo: `<noun>` is declared by both `bmo-<one>` and `bmo-<other>` `` on standard error | 2 |
 | a unit command that cannot be started | ``bmo: `bmo-<unit>` could not be started: <reason>`` on standard error | 1 |
@@ -76,6 +81,9 @@ The words `bmo` is given are read in this order, and the first rule that matches
 - **The help** lists the global options and the tool verb, then every noun found, each with the unit command declaring it, then
   every unit command the git rule reaches.
 - **The words of a not-served answer** are the words as given, the leading options taken out.
+- **The begun words** are the longest run of leading words that the start of a declared noun spells; the nouns
+  beginning with them are listed in order, each indented, the unit commands aligned in a column after them, as
+  the help lists nouns.
 
 ## The home bridge
 

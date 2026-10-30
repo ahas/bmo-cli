@@ -84,6 +84,7 @@ pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
       .unwrap_or_else(|| hand::hand(unit, hand::with_via(&words, noun.words.len(), via))),
     Resolution::Conflict { noun, one, other } => answer::conflict(&noun, one, other),
     Resolution::Git { unit } => hand::hand(unit, hand::with_via(&words[1..], 0, via)),
+    Resolution::Begun { words, nouns } => answer::begun(&words, &nouns),
     Resolution::NotServed => answer::not_served(&words),
   }
 }

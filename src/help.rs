@@ -39,8 +39,13 @@ fn listed(text: &mut String, title: &str, rows: &[(String, &str)]) {
     return;
   }
 
-  let width = rows.iter().map(|(command, _)| command.len()).max().unwrap_or(0);
   let _ = write!(text, "\n{title}:\n");
+  aligned(text, rows);
+}
+
+/// Commands one a line, each indented and beside the unit command that carries it, those aligned in a column.
+pub fn aligned(text: &mut String, rows: &[(String, &str)]) {
+  let width = rows.iter().map(|(command, _)| command.len()).max().unwrap_or(0);
 
   for (command, unit) in rows {
     let _ = writeln!(text, "  {command:width$}  {unit}");

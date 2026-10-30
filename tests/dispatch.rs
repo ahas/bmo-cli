@@ -29,8 +29,8 @@ const JOB_COMMANDS: [&str; 18] = [
   "room jobs",
 ];
 
-// Commands no installed unit declares and no first word names a unit command for.
-const NOT_SERVED: [&str; 19] = [
+// Commands whose first word begins no noun an installed unit declares and names no unit command.
+const NOT_SERVED: [&str; 18] = [
   "gate eval",
   "browse",
   "voice say",
@@ -38,7 +38,6 @@ const NOT_SERVED: [&str; 19] = [
   "file share",
   "query",
   "graph",
-  "room say",
   "memory",
   "note",
   "watch set",
@@ -101,6 +100,70 @@ fn every_command_no_unit_declares_is_not_served() {
       format!("bmo: `{command}` is not served yet: no installed unit carries it\n")
     );
   }
+}
+
+#[test]
+fn leading_words_that_begin_declared_nouns_list_them() {
+  let bench = Bench::new();
+  bench.unit("bmo-testbed", &["deploy commit", "deploy backups", "test suite"]);
+  bench.unit("bmo-job", &JOB_NOUNS);
+
+  for asked in [
+    &["deploy"][..],
+    &["deploy", "--help"],
+    &["deploy", "foo"],
+    &["help", "deploy"],
+    &["--via", "r", "deploy"],
+  ] {
+    let output = bench.bmo(asked);
+
+    assert_eq!(output.status.code(), Some(2), "{asked:?}");
+    assert!(output.stdout.is_empty(), "{asked:?}");
+    assert_eq!(
+      errors(&output),
+      "bmo: `deploy` is not a command of its own; the nouns beginning with it are:\n  \
+       deploy backups  bmo-testbed\n  \
+       deploy commit   bmo-testbed\n",
+      "{asked:?}"
+    );
+  }
+
+  let output = bench.bmo(&["research"]);
+
+  assert_eq!(output.status.code(), Some(2));
+  assert_eq!(
+    errors(&output),
+    "bmo: `research` is not a command of its own; the nouns beginning with it are:\n  \
+     research admit   bmo-job\n  \
+     research branch  bmo-job\n  \
+     research close   bmo-job\n  \
+     research run     bmo-job\n"
+  );
+
+  let output = bench.bmo(&["room", "say"]);
+
+  assert_eq!(output.status.code(), Some(2));
+  assert_eq!(
+    errors(&output),
+    "bmo: `room` is not a command of its own; the nouns beginning with it are:\n  room jobs  bmo-job\n"
+  );
+}
+
+#[test]
+fn the_longest_run_of_words_beginning_nouns_is_named() {
+  let bench = Bench::new();
+  bench.unit("bmo-one", &["backup run now", "backup list"]);
+  bench.unit("bmo-two", &["backup run later"]);
+
+  let output = bench.bmo(&["backup", "run", "--quiet"]);
+
+  assert_eq!(output.status.code(), Some(2));
+  assert_eq!(
+    errors(&output),
+    "bmo: `backup run` is not a command of its own; the nouns beginning with it are:\n  \
+     backup run later  bmo-two\n  \
+     backup run now    bmo-one\n"
+  );
 }
 
 #[test]
