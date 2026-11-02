@@ -6,12 +6,16 @@ name = "bmo-cli"
 languages = ["cargo"]
 
 [check]
-quick = ["layout", "dependencies", "korean", "dashes", "cargo-profile"]
+quick = ["layout", "dependencies", "korean", "dashes", "cargo-profile", "shared-versions"]
 # The text a person reads: the literals of the binary.
 people_text = ["src/**/*.rs"]
 # No code file holds Korean, so the ledger allows none anywhere.
 korean_ledger = "korean-ledger.json"
 base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-ui"]
+
+# The repository whose root holds the shared versions the manifests and the lock hold to.
+[check.shared_versions]
+repository = "bmo-chat"
 
 [build]
 binaries = ["bmo"]
