@@ -252,7 +252,6 @@ fn the_help_names_the_verb_and_use_help_its_words() {
       "--arg",
       "--json",
       "--memory",
-      "--max-seconds",
       "--tools",
       "--query",
       "--describe",
@@ -305,7 +304,7 @@ fn an_async_call_a_host_with_no_calls_face_keeps_in_the_workspace() {
   assert_eq!(request["room"], -5);
   assert_eq!(request["agent"], "agent-a");
   assert_eq!(request["via"], Value::Null);
-  assert_eq!(request["maxSeconds"], 86400);
+  assert_eq!(request.get("maxSeconds"), None);
   assert!(!place.join("end.json").exists());
   assert_eq!(stage.asked(), [("describe".to_owned(), "web/read".to_owned())]);
 
@@ -318,7 +317,6 @@ fn an_async_call_a_host_with_no_calls_face_keeps_in_the_workspace() {
       format!("--unit=bmo-use-{id}"),
       "--collect".to_owned(),
       "--quiet".to_owned(),
-      "--property=RuntimeMaxSec=86400".to_owned(),
       format!("--property=ExecStopPost={exe} use --ended {id}"),
       format!("--setenv=BMO_DATA_DIR={}", stage.root().display()),
       format!("--setenv=BMO_USE_RECORD_DIR={}", stage.records().display()),
@@ -343,17 +341,8 @@ fn an_async_call_a_host_with_no_calls_face_keeps_in_the_workspace() {
 fn an_async_call_is_asked_of_the_host_and_kept_there() {
   let stage = Stage::with_calls();
 
-  let output = stage.bmo(&[
-    "use",
-    "web/read",
-    "--async",
-    "--memory",
-    "tell the owner",
-    "--arg",
-    "name=page",
-    "--max-seconds",
-    "90",
-  ]);
+  let output =
+    stage.bmo(&["use", "web/read", "--async", "--memory", "tell the owner", "--arg", "name=page"]);
 
   assert!(output.status.success(), "{}", errors(&output));
 
@@ -378,7 +367,7 @@ fn an_async_call_is_asked_of_the_host_and_kept_there() {
   assert_eq!(asked[0].body["memory"], json!("tell the owner"));
   assert_eq!(asked[0].body["room"], json!(-5));
   assert_eq!(asked[0].body["agent"], json!("agent-a"));
-  assert_eq!(asked[0].body["maxSeconds"], json!(90));
+  assert_eq!(asked[0].body.get("maxSeconds"), None);
 
   // The caller's shell kept nothing: no record under the data root, nothing in its workspace, no unit started.
   assert!(!stage.root().exists());
@@ -623,14 +612,12 @@ fn a_tool_described_is_printed_as_the_hosts_object_and_not_called() {
 }
 
 #[test]
-fn a_longest_run_given_is_the_units_and_the_records() {
+fn a_longest_run_still_given_is_read_and_bounds_nothing() {
   let stage = Stage::new();
   let id = stage.started(&["use", "web/read", "--async", "--max-seconds", "90"]);
 
-  assert!(stage.unit_words().contains(&"--property=RuntimeMaxSec=90".to_owned()));
-  assert_eq!(read(&stage.records().join(&id).join("request.json"))["maxSeconds"], 90);
-  assert_eq!(stage.bmo(&["use", "web/read", "--async", "--max-seconds", "0"]).status.code(), Some(2));
-  assert_eq!(stage.bmo(&["use", "web/read", "--max-seconds", "90"]).status.code(), Some(2));
+  assert!(!stage.unit_words().iter().any(|word| word.contains("RuntimeMaxSec")));
+  assert_eq!(read(&stage.records().join(&id).join("request.json")).get("maxSeconds"), None);
 }
 
 #[test]

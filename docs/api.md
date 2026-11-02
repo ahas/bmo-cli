@@ -16,8 +16,8 @@ generated client; its fixed API is the command line below.
 - **Every such executable is taken for a unit command** and asked `nouns`, so a program that is not one, a
   service's own server binary among them, is not installed under a `bmo-` name in those directories.
 - **How `nouns` is asked:** with standard input closed and standard error discarded, every unit command at
-  once, each given two seconds. A command that ends with any code but 0, prints nothing, or does not end in
-  time declares no nouns; one still running at its time is stopped.
+  once, each waited for until it has ended and its output has closed. A command that ends with any code but 0
+  or prints nothing declares no nouns.
 - **The answers are cached** in `bmo-cli/nouns.json` under the user's cache directory (`XDG_CACHE_HOME`, else
   `.cache` in the home directory), each keyed by the unit command's path, size and modification time. A unit
   command that changes is asked again; one that no longer stands is dropped. A cache that cannot be read or
@@ -93,10 +93,9 @@ handed whole to the operations machine, and what comes back is the run's own.
 - **When:** `BMO_HOME_BRIDGE` names the bridge's socket, a non-empty path, and the command resolves to a
   declared noun carrying the `home` mark. Any other command, or any command where no bridge is named, runs
   where it was asked.
-- **Reaching the bridge:** the socket is tried until it answers, again every second or every
-  `BMO_HOME_BRIDGE_WAIT_MS` where that is shorter, for at most `BMO_HOME_BRIDGE_WAIT_MS` milliseconds,
-  15 seconds where it names no positive number. Out of reach, `bmo` says on standard error that the operations
-  machine is out of reach from the node `BMO_NODE` names and that the command was not run, and ends with 2.
+- **Reaching the bridge:** the socket is connected to once. Where it stands nowhere or refuses the connection,
+  the bridge is out of reach: `bmo` says on standard error that the operations machine is out of reach from the
+  node `BMO_NODE` names and that the command was not run, and ends with 2.
 - **The request:** one line of JSON: `script`, the binary as the bridge names it under the deploy tree,
   `bin/bmo`; `args`, every word `bmo` was given, its own options included, in their order; `env`, every
   variable of the run whose name starts with `BMO_` or `CLAUDE`; and `cwd`, the directory it was asked from.
@@ -120,7 +119,7 @@ route. `use` calls each across that published contract and reads nothing else of
 | Asked | What it does |
 |---|---|
 | `bmo use <tool> [--sync] [--arg <key>=<value>]… [--json <object>]` | calls the tool and waits for its answer |
-| `bmo use <tool> --async [--memory <words>] [--room <room>] [--agent <name>] [--max-seconds <n>] [--arg …]… [--json …]` | asks the tool host to run the call and answers its id |
+| `bmo use <tool> --async [--memory <words>] [--room <room>] [--agent <name>] [--arg …]… [--json …]` | asks the tool host to run the call and answers its id |
 | `bmo use --tools [--query <words>]` | the tools `use` reaches, one a line |
 | `bmo use <tool> --describe` | the tool as the host describes it, as JSON |
 | `bmo use --list` | every call kept, one a line |
@@ -205,18 +204,17 @@ route. `use` calls each across that published contract and reads nothing else of
 - **The road of a shell whose host serves no calls face,** and of the records a caller keeps itself: the request is
   kept before the unit starts, the unit is `bmo-use-<id>`, and its answer and end are kept in the same record
   folder, which the wake names as the answer's path there.
-- **The unit** is started with `systemd-run --user --unit=bmo-use-<id> --collect --quiet`, then its longest run
-  as `--property=RuntimeMaxSec=<n>`, its last word as `--property=ExecStopPost=<bmo> use --ended <id>`, each
-  variable below set with `--setenv`, and runs the same `bmo` binary as `use --run <id>`; `--run` and `--ended`
-  are words for the unit alone. It is handed `BMO_DATA_DIR`, the data root resolved, `BMO_USE_RECORD_DIR`, the
+- **The unit** is started with `systemd-run --user --unit=bmo-use-<id> --collect --quiet`, then its last word
+  as `--property=ExecStopPost=<bmo> use --ended <id>`, each variable below set with `--setenv`, and runs the same
+  `bmo` binary as `use --run <id>`; `--run` and `--ended` are words for the unit alone. It is handed `BMO_DATA_DIR`, the data root resolved, `BMO_USE_RECORD_DIR`, the
   record folder, and, by name from the caller's environment where they are set, `BMO_MCP_TOKEN`,
   `BMO_MCP_HOST_PORT`, `RECEIVER_ADDRESS` and `RECEIVER_TOKEN`; no token stands on its command line.
-- **Its longest run** is `--max-seconds <n>` seconds, a positive whole number, else 86400, one day. A unit still
-  running then is stopped, and its last word wakes the agent with the failure.
+- **It runs until the call ends,** however long that takes: no span of `bmo`'s or of systemd's stops it. A
+  `--max-seconds` still given is read and has no effect.
 - **The record is a folder,** `<record dir>/<id>/`, readable by the user alone, the record dir being the host's
   `use/` under its data root or the caller's own `.bmo/use/` in its workspace:
   - `request.json`, written before the unit starts: `id`, `tool`, `reachedBy` (`call` or `act`), `arguments`,
-    `memory`, `room`, `agent`, `via`, `unit`, `maxSeconds` and `startedAt`;
+    `memory`, `room`, `agent`, `via`, `unit` and `startedAt`;
   - `answer.json`, once the call ends: the tool's result as the host answered it, or the refusal or the failure as
     `{code, error}`;
   - `end.json`, last: `endedAt`, `state` (`done`, `refused` or `failed`), `summary`, and `wake`, the instruction's
@@ -224,19 +222,18 @@ route. `use` calls each across that published contract and reads nothing else of
 - **The run calls the tool as a synchronous call does,** through the proxy the request names; a run with no
   token is refused by the code `unauthorized`. A refusal is its answer and ends it as `refused`.
 - **The unit's last word, `use --ended <id>`,** runs whenever the unit stops, however it stopped. Where the run
-  kept its end, it does nothing. Where it did not, the run died before it ended: stopped at its longest run, killed,
-  or failed outside the call. The last word then keeps the failure as the answer, `{code: "failed", error}`, where
-  no answer stands, keeps the end as `failed`, and wakes the agent with it as a run's end does, so no agent is left
-  waiting on a unit that is gone. Its `error` names how the unit ended, by the service result, exit code and exit
+  kept its end, it does nothing. Where it did not, the run died before it ended: stopped, killed, or failed
+  outside the call. The last word then keeps the failure as the answer, `{code: "failed", error}`, where no answer
+  stands, keeps the end as `failed`, and wakes the agent with it as a run's end does, so no agent is left waiting
+  on a unit that is gone. Its `error` names how the unit ended, by the service result, exit code and exit
   status systemd hands it.
 - **The token a unit carries is the caller's, as it stood when `use --async` was asked.** `use` issues none and
   refreshes none, and keeps none on disk. The host checks it when the call reaches it, and what the record's tools
-  keep for a call ends with the record, so the token must stand for the unit's whole run, which is at most its
-  longest run. A tool session issued with an expiry lapses then; one issued without stands until its issuer
-  revokes it, as an issuer does when the program carrying it is replaced. An issuer that hands a session `use`
-  therefore issues its token to outlast the longest run, or stands it until it is revoked; a unit whose token
-  lapsed or was revoked first is refused by the code `unauthorized`, or dies under its call and ends as `failed`,
-  and the agent is woken with either.
+  keep for a call ends with the record, so the token must stand for the unit's whole run. A tool session issued
+  with an expiry lapses then; one issued without stands until its issuer revokes it, as an issuer does when the
+  program carrying it is replaced. An issuer that hands a session `use` therefore stands it until it is revoked;
+  a unit whose token lapsed or was revoked first is refused by the code `unauthorized`, or dies under its call and
+  ends as `failed`, and the agent is woken with either.
 
 ### The wake
 
@@ -277,7 +274,7 @@ route. `use` calls each across that published contract and reads nothing else of
   holds; **a long call** is any tool run asynchronously, a draw that announces its result in a later turn
   among them. Each wakes the agent once, as 「The wake」 states, with the tool's answer and the `--memory` it was
   given; a repeating reminder is the next one set by the turn its wake opens.
-- **A wait longer than a day** needs `--max-seconds` past it, since the unit is stopped at its longest run.
+- **A wait of any length** is the same call: the unit runs until the tool answers.
 - **Cancelling one** is stopping its unit, `bmo-use-<id>`; its last word keeps the end as `failed` and wakes the
   agent with it, so the agent learns the wait is gone.
 

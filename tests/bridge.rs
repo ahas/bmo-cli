@@ -124,15 +124,8 @@ fn a_bridge_out_of_reach_is_refused_and_the_command_not_run() {
   home_unit(&bench);
   let socket = bench.path().join("absent.sock");
 
-  let output = bench.bmo_given(
-    &["todo"],
-    "",
-    &[
-      ("BMO_HOME_BRIDGE", socket.to_str().unwrap()),
-      ("BMO_HOME_BRIDGE_WAIT_MS", "1"),
-      ("BMO_NODE", "n1"),
-    ],
-  );
+  let output =
+    bench.bmo_given(&["todo"], "", &[("BMO_HOME_BRIDGE", socket.to_str().unwrap()), ("BMO_NODE", "n1")]);
 
   assert_eq!(output.status.code(), Some(2));
   assert!(output.stdout.is_empty());

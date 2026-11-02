@@ -2,15 +2,11 @@
 //! record and runs it, and the records it answers back. Nothing of a call is written in the caller's file system.
 
 use std::path::Path;
-use std::time::Duration;
 
 use serde_json::Value;
 
 use super::ground;
 use super::toolbook::DEFAULT_PORT;
-
-// How long the host is given to answer, in seconds.
-const ANSWER_WITHIN: Duration = Duration::from_secs(30);
 
 /// The tool host's calls face: the port and the token the toolbook is asked with.
 pub struct Calls {
@@ -25,11 +21,7 @@ impl Calls {
     let token = ground::variable("BMO_MCP_TOKEN")?;
     let port = ground::published("BMO_MCP_HOST_PORT", root, "env/pocket.env")
       .unwrap_or_else(|| DEFAULT_PORT.to_owned());
-    let agent = ureq::Agent::config_builder()
-      .http_status_as_error(false)
-      .timeout_global(Some(ANSWER_WITHIN))
-      .build()
-      .into();
+    let agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
 
     Some(Self {
       base: format!("http://127.0.0.1:{port}"),

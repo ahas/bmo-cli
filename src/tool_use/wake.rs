@@ -2,7 +2,6 @@
 //! room, carrying the answer's path and a one-line summary (docs/api.md, 「The wake」).
 
 use std::path::Path;
-use std::time::Duration;
 
 use serde_json::{Value, json};
 
@@ -15,9 +14,6 @@ pub const SORT: &str = "use-ended";
 
 // The longest summary, in characters.
 const SUMMARY_CHARS: usize = 160;
-
-// How long the receiver is given to answer.
-const ANSWER_WITHIN: Duration = Duration::from_secs(30);
 
 /// One line saying how a call of `tool` ended.
 pub fn summary(tool: &str, outcome: &Result<Value, Refusal>) -> String {
@@ -81,11 +77,7 @@ pub fn send(root: &Path, body: &Value) -> Result<i64, String> {
     .ok_or("no receiver address: RECEIVER_ADDRESS is set nowhere")?;
   let token = ground::published("RECEIVER_TOKEN", root, "env/receiver.env")
     .ok_or("no receiver token: RECEIVER_TOKEN is set nowhere")?;
-  let agent: ureq::Agent = ureq::Agent::config_builder()
-    .http_status_as_error(false)
-    .timeout_global(Some(ANSWER_WITHIN))
-    .build()
-    .into();
+  let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
   let url = format!("{}/instructions", address.trim_end_matches('/'));
   let mut response = agent
     .post(&url)

@@ -18,9 +18,6 @@ use serde_json::{Value, json};
 use self::record::{End, Request};
 use self::toolbook::{Refusal, Toolbook};
 
-/// A unit's longest run where the words name none: one day, in seconds.
-pub const DEFAULT_MAX_SECONDS: u64 = 86_400;
-
 /// The words `bmo use` reads.
 #[derive(Parser, Debug)]
 #[command(
@@ -56,13 +53,8 @@ pub struct UseLine {
   /// The agent the wake is for, else BMO_TURN_AGENT.
   #[arg(long, value_name = "NAME", requires = "asynchronous")]
   pub agent: Option<String>,
-  /// The unit's longest run, in seconds; one day where none is given.
-  #[arg(
-    long,
-    value_name = "SECONDS",
-    requires = "asynchronous",
-    value_parser = clap::value_parser!(u64).range(1..)
-  )]
+  /// Read and given no effect: a call runs until its tool answers.
+  #[arg(long, value_name = "SECONDS", hide = true)]
   pub max_seconds: Option<u64>,
   /// The tools use reaches, one a line.
   #[arg(long, conflicts_with_all = ["tool", "status", "run", "list", "ended"])]
@@ -163,7 +155,6 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
       .or_else(|| ground::variable("BMO_TURN_CHAT").and_then(|room| room.trim().parse().ok())),
     agent: line.agent.or_else(|| ground::variable("BMO_TURN_AGENT")),
     via: via.map(str::to_owned).or_else(|| ground::variable("BMO_TURN_VIA")),
-    max_seconds: line.max_seconds.unwrap_or(DEFAULT_MAX_SECONDS),
     started_at: record::now(),
   };
 
@@ -180,7 +171,6 @@ fn asked_of(request: &Request, root: &Path) -> ExitCode {
     "room": request.room,
     "agent": &request.agent,
     "via": &request.via,
-    "maxSeconds": request.max_seconds,
   });
 
   if let Some(calls) = calls::Calls::found(root) {
@@ -243,8 +233,8 @@ fn started(root: &Path, records: &Path, request: &Request) -> ExitCode {
   }
 }
 
-/// The words `systemd-run` is given to start a kept call: the unit, its longest run, its last word, each
-/// variable the run reads, and the same binary as `use --run <id>`.
+/// The words `systemd-run` is given to start a kept call: the unit, its last word, each variable the run reads,
+/// and the same binary as `use --run <id>`. The unit runs until the call ends, however long that takes.
 pub fn unit_line(request: &Request, root: &Path, records: &Path, exe: &Path) -> Vec<OsString> {
   let id = &request.id;
   let mut words: Vec<OsString> = vec![
@@ -252,7 +242,6 @@ pub fn unit_line(request: &Request, root: &Path, records: &Path, exe: &Path) -> 
     format!("--unit={}", request.unit).into(),
     "--collect".into(),
     "--quiet".into(),
-    format!("--property=RuntimeMaxSec={}", request.max_seconds).into(),
   ];
   let mut last_word = OsString::from("--property=ExecStopPost=");
 

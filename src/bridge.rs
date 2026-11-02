@@ -2,14 +2,13 @@
 //! `BMO_HOME_BRIDGE` names the bridge's socket, a home-bound command is handed whole to the operations
 //! machine: the binary's path under the deploy tree, every word, the run's own variables and the directory it
 //! was asked from, then its standing input. What comes back, output, errors and exit code, is this run's. A
-//! bridge that does not answer is tried within its wait and then refused, never passed.
+//! bridge whose socket refuses the connection, or stands nowhere, refuses the run, never passes it.
 
 use std::ffi::OsString;
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::{Duration, Instant};
 
 use serde_json::json;
 
@@ -29,24 +28,8 @@ pub fn socket() -> Option<PathBuf> {
   std::env::var_os("BMO_HOME_BRIDGE").filter(|named| !named.is_empty()).map(PathBuf::from)
 }
 
-// How long a bridge that does not answer is tried before the run is refused.
-fn reach_within() -> Duration {
-  let named = std::env::var("BMO_HOME_BRIDGE_WAIT_MS").ok().and_then(|wait| wait.parse::<u64>().ok());
-
-  Duration::from_millis(named.filter(|wait| *wait > 0).unwrap_or(15_000))
-}
-
 fn reach(socket: &Path) -> Result<UnixStream, String> {
-  let within = reach_within();
-  let deadline = Instant::now() + within;
-
-  loop {
-    match UnixStream::connect(socket) {
-      Ok(stream) => return Ok(stream),
-      Err(why) if Instant::now() >= deadline => return Err(why.to_string()),
-      Err(_) => std::thread::sleep(within.min(Duration::from_secs(1))),
-    }
-  }
+  UnixStream::connect(socket).map_err(|why| why.to_string())
 }
 
 fn frame(channel: u8, bytes: &[u8]) -> Vec<u8> {

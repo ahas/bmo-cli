@@ -5,15 +5,8 @@ use std::io::Read as _;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-
-/// How long a unit command is given to answer `nouns`.
-pub const ANSWER_WITHIN: Duration = Duration::from_secs(2);
-
-// How often a command still answering is looked at again.
-const LOOK_AGAIN: Duration = Duration::from_millis(5);
 
 /// One declared noun: its words, and the marks its line carries.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,9 +43,9 @@ pub fn read(answer: &str) -> Vec<Noun> {
     .collect()
 }
 
-/// The nouns the command at `path` declares: none where it cannot be run, ends with any code but 0, or does
-/// not end within `within`, when it is stopped.
-pub fn ask(path: &Path, within: Duration) -> Vec<Noun> {
+/// The nouns the command at `path` declares, once it has ended and its output has closed: none where it cannot be
+/// run or ends with any code but 0.
+pub fn ask(path: &Path) -> Vec<Noun> {
   let Ok(mut child) = Command::new(path)
     .arg("nouns")
     .stdin(Stdio::null())
@@ -72,28 +65,11 @@ pub fn ask(path: &Path, within: Duration) -> Vec<Noun> {
     let _ = sent.send(answer);
   });
 
-  let deadline = Instant::now() + within;
-  let ended = loop {
-    match child.try_wait() {
-      Ok(Some(status)) => break status.success(),
-      Ok(None) if Instant::now() < deadline => std::thread::sleep(LOOK_AGAIN),
-      _ => {
-        let _ = child.kill();
-        let _ = child.wait();
-
-        break false;
-      }
-    }
-  };
-
-  if !ended {
+  if !child.wait().is_ok_and(|status| status.success()) {
     return Vec::new();
   }
 
-  // A process the command left behind may still hold the pipe; the answer is waited for only until the deadline.
-  let left = deadline.saturating_duration_since(Instant::now()).max(LOOK_AGAIN);
-
-  match answered.recv_timeout(left) {
+  match answered.recv() {
     Ok(answer) => read(&String::from_utf8_lossy(&answer)),
     Err(_) => Vec::new(),
   }

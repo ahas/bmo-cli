@@ -75,7 +75,7 @@ pub fn declared(units: &[Unit]) -> Declared {
       .zip(&nouns)
       .enumerate()
       .filter(|(_, (_, kept))| kept.is_none())
-      .map(|(at, (unit, _))| (at, scope.spawn(move || nouns::ask(&unit.path, nouns::ANSWER_WITHIN))))
+      .map(|(at, (unit, _))| (at, scope.spawn(move || nouns::ask(&unit.path))))
       .collect();
 
     for (at, asking) in asked {
