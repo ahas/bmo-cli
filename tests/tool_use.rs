@@ -2,7 +2,7 @@
 //! `call` or `act`, its answer printed or refused, and an asynchronous call kept, started as a unit and ended
 //! with a wake to a stand-in receiver.
 
-mod support;
+use crate::support;
 
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};

@@ -1,7 +1,7 @@
 //! The dispatch contract (docs/api.md): unit commands found, their nouns read and kept, a command resolved
 //! and handed on, and what `bmo` answers itself.
 
-mod support;
+use crate::support;
 
 use std::os::unix::fs::PermissionsExt as _;
 

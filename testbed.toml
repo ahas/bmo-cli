@@ -6,7 +6,7 @@ name = "bmo-cli"
 languages = ["cargo"]
 
 [check]
-quick = ["layout", "dependencies", "korean", "dashes"]
+quick = ["layout", "dependencies", "korean", "dashes", "cargo-profile"]
 # The text a person reads: the literals of the binary.
 people_text = ["src/**/*.rs"]
 # No code file holds Korean, so the ledger allows none anywhere.

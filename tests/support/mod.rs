@@ -1,8 +1,6 @@
 //! A bench for running `bmo` as a caller does: a directory of stand-in unit commands on `PATH`, a cache
 //! directory and a home of its own, all removed with the bench.
 
-#![allow(dead_code)]
-
 pub mod stand_ins;
 
 use std::io::Write as _;
@@ -133,11 +131,19 @@ pub fn errors(output: &Output) -> String {
 }
 
 /// Runs `command`, writing `input` to it where given, and waits for it.
+///
+/// Every test shares one process, so a script one test has just written can still be open for writing in
+/// a child another test is forking at that moment; the start is tried again until that child has let it go.
 pub fn run(mut command: Command, input: Option<&str>) -> Output {
   command.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
   command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-  let mut child = command.spawn().unwrap();
+  let mut child = loop {
+    match command.spawn() {
+      Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => std::thread::yield_now(),
+      started => break started.unwrap(),
+    }
+  };
 
   if let Some(input) = input {
     child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();

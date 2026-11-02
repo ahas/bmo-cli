@@ -1,7 +1,7 @@
 //! The home bridge (docs/api.md, 「The home bridge」): a home-bound command asked on a work node is
 //! handed whole to a stand-in bridge on a socket of the bench's, and its answer is the run's.
 
-mod support;
+use crate::support;
 
 use std::io::{BufRead as _, BufReader, Read as _, Write as _};
 use std::os::unix::net::UnixListener;
