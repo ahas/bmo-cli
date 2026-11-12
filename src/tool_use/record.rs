@@ -1,7 +1,8 @@
 //! The records of asynchronous calls a shell keeps itself, and the folders the tool host keeps its own under: one
-//! folder each, holding the request, the answer and the end (docs/api.md, 「The tool verb」).
+//! folder each, holding the request, the answer, the end and the lock its keeper holds (docs/api.md, 「The tool
+//! verb」).
 
-use std::fs::DirBuilder;
+use std::fs::{DirBuilder, File};
 use std::hash::{BuildHasher as _, RandomState};
 use std::io::Write as _;
 use std::os::unix::fs::{DirBuilderExt as _, OpenOptionsExt as _};
@@ -18,6 +19,8 @@ pub const REQUEST: &str = "request.json";
 pub const ANSWER: &str = "answer.json";
 /// The file the end is kept in.
 pub const END: &str = "end.json";
+/// The file whichever process keeps the record at a moment holds locked.
+pub const LOCK: &str = "lock";
 
 /// A call as it was asked.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +46,13 @@ pub struct End {
   pub state: String,
   pub summary: String,
   pub wake: Value,
+}
+
+impl End {
+  /// Whether the wake is still owed: the receiver has queued it only where the end names its instruction's id.
+  pub fn owed(&self) -> bool {
+    self.wake["id"].as_i64().is_none()
+  }
 }
 
 /// The folder every record stands in, under the data root: what an older caller keeps, and what the host keeps.
@@ -104,8 +114,9 @@ pub fn now() -> i64 {
   SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_millis() as i64)
 }
 
-/// The record of `request` made, readable by the user alone, its request kept.
-pub fn create(records: &Path, request: &Request) -> Result<PathBuf, String> {
+/// The record of `request` made, readable by the user alone, its request kept: its folder, and its lock held
+/// until the hold is dropped.
+pub fn create(records: &Path, request: &Request) -> Result<(PathBuf, File), String> {
   let place = place(records, &request.id);
 
   DirBuilder::new()
@@ -114,9 +125,41 @@ pub fn create(records: &Path, request: &Request) -> Result<PathBuf, String> {
     .create(records)
     .and_then(|()| DirBuilder::new().mode(0o700).create(&place))
     .map_err(|why| format!("{}: {why}", place.display()))?;
+
+  let held = hold(&place)?;
+
   keep(&place.join(REQUEST), request)?;
 
-  Ok(place)
+  Ok((place, held))
+}
+
+/// The lock of the record at `place`, waited for: held until the file answered is dropped.
+pub fn hold(place: &Path) -> Result<File, String> {
+  let lock = lock_file(place)?;
+
+  lock.lock().map_err(|why| format!("{}: {why}", place.join(LOCK).display()))?;
+
+  Ok(lock)
+}
+
+/// The lock of the record at `place` where no other process holds it.
+pub fn try_hold(place: &Path) -> Option<File> {
+  let lock = lock_file(place).ok()?;
+
+  lock.try_lock().ok()?;
+
+  Some(lock)
+}
+
+// The record's lock file, made where it does not stand, readable by the user alone.
+fn lock_file(place: &Path) -> Result<File, String> {
+  std::fs::OpenOptions::new()
+    .write(true)
+    .create(true)
+    .truncate(false)
+    .mode(0o600)
+    .open(place.join(LOCK))
+    .map_err(|why| format!("{}: {why}", place.join(LOCK).display()))
 }
 
 /// `value` kept as JSON at `path`, readable by the user alone, written whole or not at all.
@@ -151,24 +194,28 @@ pub fn of(records: &Path, id: &str) -> Option<(Request, Option<End>)> {
   Some((read(&place.join(REQUEST))?, read(&place.join(END))))
 }
 
-/// A record's state: its end's, else `running` while its unit is active, else `lost`.
+/// A record's state: its end's, else `running` while its unit stands, else `lost`.
 pub fn state(request: &Request, end: Option<&End>) -> String {
   match end {
     Some(end) => end.state.clone(),
-    None if active(&request.unit) => "running".to_owned(),
+    None if standing(&request.unit) => "running".to_owned(),
     None => "lost".to_owned(),
   }
 }
 
-// Whether the user unit `unit` is active.
-fn active(unit: &str) -> bool {
+/// Whether the user unit `unit` stands: active, or starting or stopping, its last word running among them.
+pub fn standing(unit: &str) -> bool {
   Command::new("systemctl")
-    .args(["--user", "is-active", "--quiet", unit])
+    .args(["--user", "is-active", unit])
     .stdin(Stdio::null())
-    .stdout(Stdio::null())
     .stderr(Stdio::null())
-    .status()
-    .is_ok_and(|status| status.success())
+    .output()
+    .is_ok_and(|said| {
+      matches!(
+        String::from_utf8_lossy(&said.stdout).trim(),
+        "active" | "activating" | "deactivating" | "reloading" | "refreshing"
+      )
+    })
 }
 
 /// Every record kept, oldest first.

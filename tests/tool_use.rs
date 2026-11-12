@@ -505,27 +505,142 @@ fn a_refused_run_wakes_the_agent_with_the_refusal() {
 }
 
 #[test]
-fn a_wake_the_receiver_refuses_is_kept_and_ends_the_run_with_1() {
+fn a_wake_the_receiver_refuses_is_kept_owed_and_tried_until_queued() {
   let stage = Stage::new();
+  let restarting = stand_ins::receiver_refusing_first(2);
   let id = stage.started(&["use", "web/read", "--async"]);
-  let mut command = stage.bench.bmo_command(&["use", "--run", &id]);
+  let run = stage.bmo_env(
+    &["use", "--run", &id],
+    &[("RECEIVER_ADDRESS", &restarting.address()), ("BMO_USE_WAKE_RETRY_MS", "1")],
+  );
 
-  command
-    .current_dir(&stage.workspace)
-    .env("BMO_DATA_DIR", stage.root())
-    .env("BMO_MCP_TOKEN", SESSION_TOKEN)
-    .env("BMO_MCP_HOST_PORT", stage.host.port.to_string())
-    .env("RECEIVER_ADDRESS", stage.receiver.address())
-    .env("RECEIVER_TOKEN", "wrong");
-
-  let run = support::run(command, None);
-
-  assert_eq!(run.status.code(), Some(1));
+  assert!(run.status.success(), "{}", errors(&run));
+  assert_eq!(restarting.sent().len(), 3);
+  assert_eq!(restarting.sent()[0].body, restarting.sent()[2].body);
 
   let end = read(&stage.records().join(&id).join("end.json"));
 
   assert_eq!(end["state"], "done");
+  assert_eq!(end["wake"], json!({ "id": INSTRUCTION }));
+}
+
+#[test]
+fn a_last_word_whose_wake_is_not_queued_keeps_it_owed_and_hands_it_to_a_wake_unit() {
+  let stage = Stage::new();
+  let id = stage.started(&["use", "web/read", "--async"]);
+  let place = stage.records().join(&id);
+  let last_word = stage.bmo_env(&["use", "--ended", &id], &[("RECEIVER_TOKEN", "wrong")]);
+
+  assert!(last_word.status.success(), "{}", errors(&last_word));
+
+  let end = read(&place.join("end.json"));
+
+  assert_eq!(end["state"], "failed");
+  assert_eq!((end["wake"]["pending"].clone(), end["wake"]["tries"].clone()), (json!(true), json!(1)));
   assert!(end["wake"]["error"].as_str().unwrap().contains("unauthorized"), "{end}");
+
+  let words = stage.unit_words();
+
+  assert_eq!(words[1], format!("--unit=bmo-use-{id}-wake"));
+  assert!(!words.iter().any(|word| word.contains("ExecStopPost")), "{words:?}");
+  assert_eq!(words[words.len() - 3..], ["use".to_owned(), "--wake".to_owned(), id.clone()]);
+
+  let wake = stage.bmo(&["use", "--wake", &id]);
+
+  assert!(wake.status.success(), "{}", errors(&wake));
+
+  let tried = stage.receiver.sent();
+
+  assert_eq!((tried.len(), tried[0].body.clone()), (2, tried[1].body.clone()));
+  assert_eq!(tried[1].body["said"]["fact"]["state"], "failed");
+  assert_eq!(read(&place.join("end.json"))["wake"], json!({ "id": INSTRUCTION }));
+
+  let again = stage.bmo(&["use", "--wake", &id]);
+
+  assert!(again.status.success(), "{}", errors(&again));
+  assert_eq!(stage.receiver.sent().len(), 2);
+}
+
+#[test]
+fn a_try_the_receiver_leaves_unanswered_ends_at_its_bound() {
+  let stage = Stage::new();
+  let silent = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  let address = format!("http://{}", silent.local_addr().unwrap());
+  let id = stage.started(&["use", "web/read", "--async"]);
+  let last_word = stage.bmo_env(
+    &["use", "--ended", &id],
+    &[("RECEIVER_ADDRESS", &address), ("BMO_USE_WAKE_TRY_MS", "50")],
+  );
+
+  assert!(last_word.status.success(), "{}", errors(&last_word));
+
+  let wake = &read(&stage.records().join(&id).join("end.json"))["wake"];
+
+  assert_eq!(wake["pending"], true);
+  assert!(wake["error"].as_str().unwrap().contains("out of reach"), "{wake}");
+}
+
+#[test]
+fn a_record_whose_unit_stands_nowhere_is_settled_lost_and_its_wake_handed_to_a_unit() {
+  let stage = Stage::new();
+  let id = stage.started(&["use", "web/read", "--async", "--memory", "tell the owner"]);
+  let place = stage.records().join(&id);
+
+  assert_eq!(lines(&stage.bmo(&["use", "--list"])), [format!("{id}  lost  web/read")]);
+
+  let why = "its unit stood nowhere and kept no end, as where the machine restarted under it";
+  let end = read(&place.join("end.json"));
+
+  assert_eq!(read(&place.join("answer.json")), json!({ "code": "lost", "error": why }));
+  assert_eq!(
+    (end["state"].clone(), end["wake"].clone()),
+    (json!("lost"), json!({ "pending": true, "tries": 0 }))
+  );
+
+  let exe = env!("CARGO_BIN_EXE_bmo");
+
+  assert_eq!(
+    stage.unit_words(),
+    [
+      "--user".to_owned(),
+      format!("--unit=bmo-use-{id}-wake"),
+      "--collect".to_owned(),
+      "--quiet".to_owned(),
+      format!("--setenv=BMO_DATA_DIR={}", stage.root().display()),
+      format!("--setenv=BMO_USE_RECORD_DIR={}", stage.records().display()),
+      "--setenv=BMO_MCP_TOKEN".to_owned(),
+      "--setenv=BMO_MCP_HOST_PORT".to_owned(),
+      "--setenv=RECEIVER_ADDRESS".to_owned(),
+      "--setenv=RECEIVER_TOKEN".to_owned(),
+      exe.to_owned(),
+      "use".to_owned(),
+      "--wake".to_owned(),
+      id.clone(),
+    ]
+  );
+  assert!(stage.bmo(&["use", "--wake", &id]).status.success());
+
+  let fact = &stage.receiver.sent()[0].body;
+
+  assert_eq!(fact["said"]["fact"]["state"], "lost");
+  assert_eq!(fact["said"]["fact"]["memory"], "tell the owner");
+  assert_eq!(fact["summary"], format!("web/read was lost: {why}"));
+}
+
+#[test]
+fn a_record_another_process_holds_is_passed_over_by_a_settling() {
+  let stage = Stage::new();
+  let id = stage.started(&["use", "web/read", "--async"]);
+  let place = stage.records().join(&id);
+  let held = std::fs::File::open(place.join("lock")).unwrap();
+
+  held.lock().unwrap();
+
+  let status = stage.bmo(&["use", "--status", &id]);
+
+  assert!(status.status.success(), "{}", errors(&status));
+  assert!(!place.join("end.json").exists());
+  assert!(stage.unit_words().contains(&"--run".to_owned()));
 }
 
 #[test]

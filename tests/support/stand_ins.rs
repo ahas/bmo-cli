@@ -1,6 +1,7 @@
 //! A stand-in tool host and a stand-in receiver on the loopback address, each answering the requests the tool
 //! verb makes and keeping every request it was sent.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -144,13 +145,32 @@ fn toolbook_answer(sent: &Sent) -> (u16, Value) {
 
 /// A receiver that queues every instruction it is sent with its token as instruction 7.
 pub fn receiver() -> StandIn {
-  serve(|sent| match (sent.method.as_str(), sent.path.as_str()) {
+  serve(receiver_answer)
+}
+
+/// A receiver that refuses the first `refusals` requests it is sent, as one restarting does, then answers as
+/// `receiver` does.
+pub fn receiver_refusing_first(refusals: usize) -> StandIn {
+  let answered = AtomicUsize::new(0);
+
+  serve(move |sent| {
+    if answered.fetch_add(1, Ordering::SeqCst) < refusals {
+      return (503, json!({ "code": "unavailable", "error": "the receiver is restarting" }));
+    }
+
+    receiver_answer(sent)
+  })
+}
+
+// The receiver's own answer to a request.
+fn receiver_answer(sent: &Sent) -> (u16, Value) {
+  match (sent.method.as_str(), sent.path.as_str()) {
     _ if sent.bearer != format!("Bearer {RECEIVER_TOKEN}") => {
       (401, json!({ "code": "unauthorized", "error": "the token is missing or wrong" }))
     }
     ("POST", "/instructions") => (201, json!({ "id": INSTRUCTION })),
     _ => (404, json!({ "code": "no-route", "error": "no route answers this" })),
-  })
+  }
 }
 
 // A tool described as the toolbook describes one: its text, and the tool's shape as structured content.

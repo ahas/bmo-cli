@@ -206,9 +206,10 @@ route. `use` calls each across that published contract and reads nothing else of
   folder, which the wake names as the answer's path there.
 - **The unit** is started with `systemd-run --user --unit=bmo-use-<id> --collect --quiet`, then its last word
   as `--property=ExecStopPost=<bmo> use --ended <id>`, each variable below set with `--setenv`, and runs the same
-  `bmo` binary as `use --run <id>`; `--run` and `--ended` are words for the unit alone. It is handed `BMO_DATA_DIR`, the data root resolved, `BMO_USE_RECORD_DIR`, the
-  record folder, and, by name from the caller's environment where they are set, `BMO_MCP_TOKEN`,
-  `BMO_MCP_HOST_PORT`, `RECEIVER_ADDRESS` and `RECEIVER_TOKEN`; no token stands on its command line.
+  `bmo` binary as `use --run <id>`; `--run`, `--ended` and `--wake` are words for the units alone. It is handed
+  `BMO_DATA_DIR`, the data root resolved, `BMO_USE_RECORD_DIR`, the record folder, and, by name from the caller's
+  environment where they are set, `BMO_MCP_TOKEN`, `BMO_MCP_HOST_PORT`, `RECEIVER_ADDRESS`, `RECEIVER_TOKEN`,
+  `BMO_USE_WAKE_TRY_MS` and `BMO_USE_WAKE_RETRY_MS`; no token stands on its command line.
 - **It runs until the call ends,** however long that takes: no span of `bmo`'s or of systemd's stops it. A
   `--max-seconds` still given is read and has no effect.
 - **The record is a folder,** `<record dir>/<id>/`, readable by the user alone, the record dir being the host's
@@ -217,16 +218,27 @@ route. `use` calls each across that published contract and reads nothing else of
     `memory`, `room`, `agent`, `via`, `unit` and `startedAt`;
   - `answer.json`, once the call ends: the tool's result as the host answered it, or the refusal or the failure as
     `{code, error}`;
-  - `end.json`, last: `endedAt`, `state` (`done`, `refused` or `failed`), `summary`, and `wake`, the instruction's
-    `id` where the receiver queued it or `error` where it did not.
+  - `end.json`, once the answer is kept: `endedAt`, `state` (`done`, `refused`, `failed` or `lost`), `summary`,
+    and `wake`, which reads `{pending: true, tries}` while the wake is owed, with `error`, the reason the last try
+    failed, once one has, and `{id}`, the instruction's id, once the receiver queued it;
+  - `lock`, an empty file locked by whichever process keeps the record at that moment: the shell starting the
+    unit until it started, the run from keeping its answer until its wake is queued, the last word, a wake's own
+    unit, and a settling (「Settling the records」). A record locked by another process is passed over.
 - **The run calls the tool as a synchronous call does,** through the proxy the request names; a run with no
-  token is refused by the code `unauthorized`. A refusal is its answer and ends it as `refused`.
+  token is refused by the code `unauthorized`. A refusal is its answer and ends it as `refused`. The run keeps its
+  answer, then its end with the wake owed, then wakes the agent as 「The wake」 states, and the unit runs on until
+  the receiver queued the wake.
 - **The unit's last word, `use --ended <id>`,** runs whenever the unit stops, however it stopped. Where the run
-  kept its end, it does nothing. Where it did not, the run died before it ended: stopped, killed, or failed
-  outside the call. The last word then keeps the failure as the answer, `{code: "failed", error}`, where no answer
-  stands, keeps the end as `failed`, and wakes the agent with it as a run's end does, so no agent is left waiting
-  on a unit that is gone. Its `error` names how the unit ended, by the service result, exit code and exit
-  status systemd hands it.
+  kept its end and its wake was queued, it does nothing. Where no end stands, the run died before it ended:
+  stopped, killed, or failed outside the call. The last word then keeps the failure as the answer,
+  `{code: "failed", error}`, where no answer stands, and keeps the end as `failed`, its wake owed; its `error`
+  names how the unit ended, by the service result, exit code and exit status systemd hands it. Either way, an
+  owed wake, the one a run stopped while retrying left included, is tried once; where it is still owed it is
+  handed to a wake's own unit, so no agent is left waiting on a unit that is gone. A last word that could neither
+  queue the wake nor start that unit ends with 1, the wake left owed for the next settling.
+- **A wake's own unit** is `bmo-use-<id>-wake`, started as the call's unit is but with no last word, running
+  `use --wake <id>`: it waits for the record's lock, then tries an owed wake until the receiver queues it, keeping
+  the end after every try, and does nothing where the wake was queued already.
 - **The token a unit carries is the caller's, as it stood when `use --async` was asked.** `use` issues none and
   refreshes none, and keeps none on disk. The host checks it when the call reaches it, and what the record's tools
   keep for a call ends with the record, so the token must stand for the unit's whole run. A tool session issued
@@ -239,8 +251,8 @@ route. `use` calls each across that published contract and reads nothing else of
 
 - **The host wakes the agent through the receiver's `POST /instructions`,** at `RECEIVER_ADDRESS` with
   `RECEIVER_TOKEN` as the bearer, else the two the data root's `env/receiver.env` names, once the answer is kept;
-  the end is kept after it, with the wake's outcome. A call the caller keeps itself wakes as its unit's run once
-  kept its answer, with the same body. The instruction is a fact, queued in the room for the agent as a job's end
+  the host's own documents state how it keeps the wake owed. A call the caller keeps itself wakes as its unit's
+  run kept its answer and its end, with the same body. The instruction is a fact, queued in the room for the agent as a job's end
   is:
   - `agentName`, `room` and `via` as above;
   - `said.fact`: `use`, the id; `tool`; `state`; `summary`; and `memory`, and, for a call the caller keeps,
@@ -248,9 +260,28 @@ route. `use` calls each across that published contract and reads nothing else of
   - `sort` `use-ended` and `summary`, the one-line summary;
   - no `kind`, so no wake replaces another, and no expiry, events, ride or run.
 - **The summary** is one line: ``<tool> answered: <first line of its first text>``, ``<tool> was refused:
-  <code>: <why>`` or ``<tool> failed: <why>``, cut to 160 characters.
-- **A wake the receiver refuses or does not answer** is kept in the record's `end.json` as its `wake.error`, and a
-  caller's own unit ends with 1; its end is kept, so the last word does not wake again.
+  <code>: <why>``, ``<tool> failed: <why>`` or ``<tool> was lost: <why>``, cut to 160 characters.
+- **A wake is owed until the receiver queues it.** For a call the caller keeps, the end is kept with its wake
+  pending before the wake is first tried. A try that does not queue it is tried again: a refusal, a receiver out
+  of reach or named nowhere, a connection cut and a try left unanswered for thirty seconds, or what
+  `BMO_USE_WAKE_TRY_MS` names, all alike, the wait between tries doubling from a second, or what
+  `BMO_USE_WAKE_RETRY_MS` names, to a minute. The end is kept after every try. A wake whose queuing answer was
+  lost is tried again, so the receiver may queue it twice; it is never left untold.
+
+### Settling the records
+
+- **The records a caller keeps itself are settled before `use` reads or adds to them:** by `--async` where it
+  keeps the call itself, and by `--list` and `--status` where the host serves no calls face, each over the record
+  folder it reads. The data root's `use/` is passed over: the records there are the host's, and the host's own
+  documents state how it settles them.
+- **A record with no end whose unit stands nowhere,** neither active nor starting nor stopping, as where the
+  machine restarted under it, is ended `lost`: the answer `{code: "lost", error}` where none stands, its summary
+  ``<tool> was lost: <why>``, and its wake owed.
+- **Every owed wake is handed to a wake's own unit** (「The caller's own unit」), the one a unit or the receiver
+  restarted under included. An end whose `wake` holds no `id` is owed.
+- **A record whose lock another process holds is passed over,** since that process keeps it. A settling that
+  could not start a wake's unit says so on standard error and leaves the wake owed for the next one; what `use`
+  was asked goes on either way.
 
 ### Reading the records
 
@@ -261,8 +292,8 @@ route. `use` calls each across that published contract and reads nothing else of
   fields, `state`, and where it ended, `endedAt`, `summary` and `wake`; a caller's own record adds `answer`, the
   path of `answer.json`. An id the host does not hold, or a record that stands nowhere, ends with 2.
 - **A record's state** is its end's where `end.json` stands; else `running` while the host runs it, or while its
-  unit is active for a call the caller keeps; and `lost` once it runs neither, as where the machine restarted
-  under it.
+  unit is active, starting or stopping for a call the caller keeps; and `lost` once it runs neither, as where the
+  machine restarted under it, which a settling then keeps as its end.
 
 ### Waiting is the caller's, not the tool's
 
