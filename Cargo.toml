@@ -23,6 +23,8 @@ test = false
 clap ={ version = "4.5.40", default-features = false, features = ["std", "derive", "error-context", "help", "usage"] }
 # The tool verb reads the env files the tool host and the receiver publish under the data root.
 dotenvy = "0.15.7"
+# The nouns probe kills a unit command that outlives its bound with its whole process group.
+libc = "0.2.191"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.138"
 # The tool verb's calls on the loopback address: the toolbook and the receiver's instruction route.

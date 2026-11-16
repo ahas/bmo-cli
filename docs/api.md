@@ -16,12 +16,18 @@ generated client; its fixed API is the command line below.
 - **Every such executable is taken for a unit command** and asked `nouns`, so a program that is not one, a
   service's own server binary among them, is not installed under a `bmo-` name in those directories.
 - **How `nouns` is asked:** with standard input closed and standard error discarded, every unit command at
-  once, each waited for until it has ended and its output has closed. A command that ends with any code but 0
-  or prints nothing declares no nouns.
+  once, each as the leader of a process group of its own, and each waited for until it has ended and its output
+  has closed. A command that ends with any code but 0 or prints nothing declares no nouns.
+- **The wait is bounded:** five seconds, or the whole number of milliseconds `BMO_NOUNS_WAIT_MS` names. A
+  command that has not ended and closed its output by then is killed with its whole process group, declares no
+  nouns for this call and is asked again on the next; `bmo` names it on standard error (「What `bmo` answers
+  itself」) and goes on with the nouns the others declared.
 - **The answers are cached** in `bmo-cli/nouns.json` under the user's cache directory (`XDG_CACHE_HOME`, else
   `.cache` in the home directory), each keyed by the unit command's path, size and modification time. A unit
-  command that changes is asked again; one that no longer stands is dropped. A cache that cannot be read or
-  written is passed over, and every unit command is asked afresh.
+  command that changes is asked again; one that no longer stands is dropped. A unit command this call did not
+  find, its directory being off this call's `PATH`, keeps its answer while its file stands unchanged. A unit
+  command that did not answer within the bound keeps no answer. A cache that cannot be read or written is
+  passed over, and every unit command is asked afresh.
 
 ## The nouns a unit declares
 
@@ -75,6 +81,7 @@ The words `bmo` is given are read in this order, and the first rule that matches
 | words nothing serves | ``bmo: `<words>` is not served yet: no installed unit carries it`` on standard error | 2 |
 | a noun two unit commands declare | ``bmo: `<noun>` is declared by both `bmo-<one>` and `bmo-<other>` `` on standard error | 2 |
 | a unit command that cannot be started | ``bmo: `bmo-<unit>` could not be started: <reason>`` on standard error | 1 |
+| a unit command that did not answer `nouns` within the bound | ``bmo: `bmo-<unit>` did not answer `nouns` within <bound> ms; its nouns are left out of this call`` on standard error, and the call goes on | the call's |
 | an option before the first word that `bmo` does not read | ``bmo: `<option>` is not an option of bmo; options of a command follow its words`` on standard error | 2 |
 | `bmo use …` | the tool verb's own answer (「The tool verb」) | the verb's |
 

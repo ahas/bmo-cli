@@ -1,12 +1,13 @@
 //! The nouns every unit command declares, kept between runs so a command is asked only when it has changed
 //! (docs/api.md, 「The unit command」).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
+use crate::answer;
 use crate::nouns::{self, Noun};
 use crate::units::Unit;
 
@@ -43,6 +44,13 @@ struct Kept {
   nouns: Vec<Noun>,
 }
 
+impl Kept {
+  // Whether the answer was read from the file as it stands now, by its size and modification time.
+  fn stamped(&self, stamp: Option<(u64, u64)>) -> bool {
+    stamp == Some((self.size, self.modified_ms))
+  }
+}
+
 // What the cache file holds: each unit command's path to its kept answer.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct Cache {
@@ -50,7 +58,8 @@ struct Cache {
 }
 
 /// The nouns of every unit command in `units`, from the cache where the command is unchanged and asked
-/// afresh where it is not, every command asked at once; the cache is then written again where it changed.
+/// afresh where it is not, every command asked at once and each within the bound; the cache is then written
+/// again where it changed, the answers of unchanged commands this call did not find kept in it.
 pub fn declared(units: &[Unit]) -> Declared {
   let file = cache_file();
   let before: Cache = file
@@ -59,15 +68,19 @@ pub fn declared(units: &[Unit]) -> Declared {
     .and_then(|bytes| serde_json::from_slice(&bytes).ok())
     .unwrap_or_default();
   let stamps: Vec<Option<(u64, u64)>> = units.iter().map(|unit| stamp(&unit.path)).collect();
+  // Each command's nouns: kept where unchanged, then asked; a command that did not answer in time stays `None`.
   let mut nouns: Vec<Option<Vec<Noun>>> = units
     .iter()
     .zip(&stamps)
     .map(|(unit, stamp)| {
-      let kept = before.units.get(&unit.path)?;
-
-      (Some((kept.size, kept.modified_ms)) == *stamp).then(|| kept.nouns.clone())
+      before
+        .units
+        .get(&unit.path)
+        .filter(|kept| kept.stamped(*stamp))
+        .map(|kept| kept.nouns.clone())
     })
     .collect();
+  let bound = nouns::bound();
 
   std::thread::scope(|scope| {
     let asked: Vec<_> = units
@@ -75,33 +88,38 @@ pub fn declared(units: &[Unit]) -> Declared {
       .zip(&nouns)
       .enumerate()
       .filter(|(_, (_, kept))| kept.is_none())
-      .map(|(at, (unit, _))| (at, scope.spawn(move || nouns::ask(&unit.path))))
+      .map(|(at, (unit, _))| (at, scope.spawn(move || nouns::ask(&unit.path, bound))))
       .collect();
 
     for (at, asking) in asked {
-      nouns[at] = Some(asking.join().unwrap_or_default());
+      nouns[at] = asking.join().unwrap_or_else(|_| Some(Vec::new()));
+
+      if nouns[at].is_none() {
+        answer::unanswered(&units[at].name, bound);
+      }
     }
   });
 
-  let nouns: Vec<Vec<Noun>> = nouns.into_iter().map(Option::unwrap_or_default).collect();
-  let after = Cache {
-    units: units
-      .iter()
-      .zip(&stamps)
-      .zip(&nouns)
-      .filter_map(|((unit, stamp), nouns)| {
-        let (size, modified_ms) = (*stamp)?;
+  let found: BTreeSet<&Path> = units.iter().map(|unit| unit.path.as_path()).collect();
+  let unfound = before
+    .units
+    .iter()
+    .filter(|(path, kept)| !found.contains(path.as_path()) && kept.stamped(stamp(path)))
+    .map(|(path, kept)| (path.clone(), kept.clone()));
+  let answered = units.iter().zip(&stamps).zip(&nouns).filter_map(|((unit, stamp), nouns)| {
+    let (size, modified_ms) = (*stamp)?;
 
-        Some((
-          unit.path.clone(),
-          Kept {
-            size,
-            modified_ms,
-            nouns: nouns.clone(),
-          },
-        ))
-      })
-      .collect(),
+    Some((
+      unit.path.clone(),
+      Kept {
+        size,
+        modified_ms,
+        nouns: nouns.clone()?,
+      },
+    ))
+  });
+  let after = Cache {
+    units: unfound.chain(answered).collect(),
   };
 
   if after != before
@@ -112,7 +130,7 @@ pub fn declared(units: &[Unit]) -> Declared {
 
   Declared {
     units: units.to_vec(),
-    nouns,
+    nouns: nouns.into_iter().map(Option::unwrap_or_default).collect(),
   }
 }
 

@@ -2,9 +2,11 @@
 //! answer is this platform's own protocol, one noun a line with its marks after a tab, so it is read here.
 
 use std::io::Read as _;
+use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -43,34 +45,61 @@ pub fn read(answer: &str) -> Vec<Noun> {
     .collect()
 }
 
+/// How long a unit command is given to answer `nouns`: the whole number of milliseconds `BMO_NOUNS_WAIT_MS`
+/// names, else five seconds.
+pub fn bound() -> Duration {
+  std::env::var("BMO_NOUNS_WAIT_MS")
+    .ok()
+    .and_then(|named| named.trim().parse().ok())
+    .map_or(DEFAULT_BOUND, Duration::from_millis)
+}
+
+const DEFAULT_BOUND: Duration = Duration::from_secs(5);
+
 /// The nouns the command at `path` declares, once it has ended and its output has closed: none where it cannot be
-/// run or ends with any code but 0.
-pub fn ask(path: &Path) -> Vec<Noun> {
+/// run or ends with any code but 0. Where it has not ended and closed its output within `bound`, it is killed
+/// with its process group and the answer is `None`.
+pub fn ask(path: &Path, bound: Duration) -> Option<Vec<Noun>> {
   let Ok(mut child) = Command::new(path)
     .arg("nouns")
     .stdin(Stdio::null())
     .stdout(Stdio::piped())
     .stderr(Stdio::null())
+    .process_group(0)
     .spawn()
   else {
-    return Vec::new();
+    return Some(Vec::new());
   };
-  let Some(mut output) = child.stdout.take() else { return Vec::new() };
+  let leader = child.id();
+  let Some(mut output) = child.stdout.take() else { return Some(Vec::new()) };
   let (sent, answered) = mpsc::channel();
 
-  // The answer is read beside the wait, so a long answer never stalls the command on a full pipe.
+  // The answer is read to its end before the wait, so a long answer never stalls the command on a full pipe.
   std::thread::spawn(move || {
     let mut answer = Vec::new();
-    let _ = output.read_to_end(&mut answer);
-    let _ = sent.send(answer);
+    let whole = output.read_to_end(&mut answer).is_ok();
+    let ended = child.wait().is_ok_and(|status| status.success());
+    let _ = sent.send((whole && ended).then_some(answer));
   });
 
-  if !child.wait().is_ok_and(|status| status.success()) {
-    return Vec::new();
-  }
+  match answered.recv_timeout(bound) {
+    Ok(answer) => Some(answer.map(|answer| read(&String::from_utf8_lossy(&answer))).unwrap_or_default()),
+    Err(_) => {
+      kill_group(leader);
+      // The killed command is reaped before `bmo` goes on, so none is left behind it.
+      let _ = answered.recv_timeout(bound);
 
-  match answered.recv() {
-    Ok(answer) => read(&String::from_utf8_lossy(&answer)),
-    Err(_) => Vec::new(),
+      None
+    }
+  }
+}
+
+// Every process in the group `leader` leads, killed.
+fn kill_group(leader: u32) {
+  let Ok(group) = libc::pid_t::try_from(leader) else { return };
+
+  // SAFETY: `kill` touches no memory of this process; a negative id names a process group.
+  unsafe {
+    libc::kill(-group, libc::SIGKILL);
   }
 }

@@ -4,6 +4,7 @@
 use crate::support;
 
 use std::os::unix::fs::PermissionsExt as _;
+use std::path::Path;
 
 use support::{Bench, JOB_NOUNS, errors, lines};
 
@@ -334,6 +335,65 @@ fn an_unchanged_command_is_asked_its_nouns_once_and_a_changed_one_again() {
   assert_eq!(times_asked(), 2);
   assert_eq!(bench.bmo_given(&["first"], "", &variables).status.code(), Some(2));
   assert_eq!(times_asked(), 2);
+}
+
+#[test]
+fn a_unit_command_that_never_answers_its_nouns_is_left_out_killed_and_asked_again() {
+  let bench = Bench::new();
+  let asked = bench.path().join("asked");
+  bench.unit("bmo-job", &["job"]);
+  bench.command(
+    "bmo-stuck",
+    "if [ \"$1\" = nouns ]; then echo $$ >> \"$ASKED\"; exec sleep 600; fi\necho bmo-stuck",
+  );
+  let variables = [("ASKED", asked.to_str().unwrap()), ("BMO_NOUNS_WAIT_MS", "500")];
+  let started = || -> Vec<String> {
+    std::fs::read_to_string(&asked).unwrap_or_default().lines().map(str::to_owned).collect()
+  };
+
+  for call in 1..=2 {
+    let output = bench.bmo_given(&["job", "now"], "", &variables);
+    let pids = started();
+    // `bmo` reaps what it kills before it goes on, so a stand-in still listed under /proc was left running;
+    // it is taken down here before anything is asserted.
+    let left: Vec<&String> =
+      pids.iter().filter(|pid| Path::new("/proc").join(pid.as_str()).exists()).collect();
+
+    for pid in &left {
+      let _ = std::process::Command::new("kill").args(["-KILL", pid.as_str()]).status();
+    }
+
+    assert_eq!(lines(&output), ["bmo-job", "job", "now"]);
+    assert_eq!(
+      errors(&output),
+      "bmo: `bmo-stuck` did not answer `nouns` within 500 ms; its nouns are left out of this call\n"
+    );
+    assert_eq!(pids.len(), call, "asked again on every call");
+    assert!(left.is_empty(), "left running: {left:?}");
+  }
+}
+
+#[test]
+fn a_call_with_a_narrower_path_keeps_the_answers_of_the_commands_it_does_not_find() {
+  let bench = Bench::new();
+  let asked = bench.path().join("asked");
+  let other = bench.path().join("other");
+  std::fs::create_dir(&other).unwrap();
+  bench.unit("bmo-job", &["job"]);
+  bench.command_in(
+    &other,
+    "bmo-far",
+    "if [ \"$1\" = nouns ]; then echo x >> \"$ASKED\"; echo far; exit 0; fi\necho \"$1\"",
+  );
+  let wide_path = format!("{}:{}:/usr/bin:/bin", bench.bin().display(), other.display());
+  let wide = [("ASKED", asked.to_str().unwrap()), ("PATH", wide_path.as_str())];
+  let narrow = [("ASKED", asked.to_str().unwrap())];
+  let times_asked = || std::fs::read_to_string(&asked).unwrap_or_default().lines().count();
+
+  assert_eq!(lines(&bench.bmo_given(&["far"], "", &wide)), ["far"]);
+  assert_eq!(lines(&bench.bmo_given(&["job"], "", &narrow)), ["bmo-job", "job"]);
+  assert_eq!(lines(&bench.bmo_given(&["far"], "", &wide)), ["far"]);
+  assert_eq!(times_asked(), 1);
 }
 
 #[test]

@@ -1,8 +1,9 @@
-//! What `bmo` answers itself, each answer a line on standard error and the exit code it ends with
-//! (docs/api.md, 「What `bmo` answers itself」).
+//! What `bmo` answers itself, each answer a line on standard error and, where it ends the call, the exit code
+//! it ends with (docs/api.md, 「What `bmo` answers itself」).
 
 use std::ffi::OsString;
 use std::process::ExitCode;
+use std::time::Duration;
 
 use crate::help;
 use crate::nouns::Noun;
@@ -33,6 +34,14 @@ pub fn conflict(noun: &str, one: &Unit, other: &Unit) -> ExitCode {
   eprintln!("bmo: `{noun}` is declared by both `{}` and `{}`", one.name, other.name);
 
   ExitCode::from(2)
+}
+
+/// A unit command that did not answer `nouns` within `bound`; the call goes on without its nouns.
+pub fn unanswered(name: &str, bound: Duration) {
+  eprintln!(
+    "bmo: `{name}` did not answer `nouns` within {} ms; its nouns are left out of this call",
+    bound.as_millis()
+  );
 }
 
 /// A unit command that could not be started.
