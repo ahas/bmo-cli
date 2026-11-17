@@ -51,7 +51,7 @@ The words `bmo` is given are read in this order, and the first rule that matches
    `bmo todo --add` runs `bmo-job todo --add`. Where two unit commands declare the longest matching noun, `bmo`
    refuses, naming the noun and both commands, and ends with 2.
 3. **The git rule.** Where the first word is `<name>` and a unit command `bmo-<name>` stands, `bmo` runs it
-   with the words after the first: `bmo graph nodes` runs `bmo-graph nodes`. The unit's own answer stands, its
+   with the words after the first: `bmo note list` runs `bmo-note list`. The unit's own answer stands, its
    refusal of words it does not carry included.
 4. **Nothing matched.** Where the leading words begin one or more declared nouns without being one, `bmo`
    names the longest run of them that does and lists every noun it begins, each with the unit command declaring

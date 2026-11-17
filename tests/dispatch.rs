@@ -209,15 +209,15 @@ fn the_git_rule_hands_the_words_after_the_first_to_the_command_it_names() {
 }
 
 #[test]
-fn the_graph_reaches_bmo_graph_by_the_git_rule() {
+fn a_unit_that_declares_no_nouns_is_reached_by_the_git_rule() {
   let bench = Bench::new();
   bench.command(
-    "bmo-graph",
-    "if [ \"$1\" = nouns ]; then exit 2; fi\necho bmo-graph\nfor word in \"$@\"; do echo \"$word\"; done",
+    "bmo-note",
+    "if [ \"$1\" = nouns ]; then exit 2; fi\necho bmo-note\nfor word in \"$@\"; do echo \"$word\"; done",
   );
 
-  assert_eq!(lines(&bench.bmo(&["graph", "nodes", "api"])), ["bmo-graph", "nodes", "api"]);
-  assert_eq!(lines(&bench.bmo(&["graph"])), ["bmo-graph"]);
+  assert_eq!(lines(&bench.bmo(&["note", "list", "mine"])), ["bmo-note", "list", "mine"]);
+  assert_eq!(lines(&bench.bmo(&["note"])), ["bmo-note"]);
 }
 
 #[test]
