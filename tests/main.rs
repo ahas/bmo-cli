@@ -5,5 +5,4 @@ mod support;
 
 mod bridge;
 mod dispatch;
-mod personal_data;
 mod tool_use;

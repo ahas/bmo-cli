@@ -31,9 +31,6 @@ serde_json = "1.0.138"
 ureq = { version = "3.5.0", default-features = false, features = ["json"] }
 
 [dev-dependencies]
-# The personal-data check reads each tracked file for a mail address, a home path, a telephone number, a
-# token and a private network address.
-regex = "1.13.1"
 tempfile = "3.20.0"
 # The stand-in tool host and receiver the tool verb's tests call.
 tiny_http = "0.12.0"

@@ -6,7 +6,9 @@ name = "bmo-cli"
 languages = ["cargo"]
 
 [check]
-quick = ["layout", "dependencies", "korean", "dashes", "cargo-profile", "shared-versions"]
+quick = ["layout", "dependencies", "korean", "dashes", "cargo-profile", "shared-versions", "personal-data"]
+# The one address docs/PERSONAL-DATA.md allows.
+personal_data_allowed = ["dev@ahas.io"]
 # The text a person reads: the literals of the binary.
 people_text = ["src/**/*.rs"]
 # No code file holds Korean, so the ledger allows none anywhere.

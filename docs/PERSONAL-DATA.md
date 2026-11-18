@@ -26,10 +26,11 @@ address `dev@ahas.io`. The check admits them and no other personal value.
 
 ## The check
 
-The repository test reads every file git tracks, and a new file it does not ignore, and fails where it
-finds a mail address, a home path, a telephone number, a token or a private network address. It reports
-the file, the line and the kind, never the value it found. Files git ignores, such as the build output,
-are not read.
+The testbed's `personal-data` check, which the declaration enables, reads every file git tracks, and a new
+file it does not ignore, and fails where it finds a mail address, a home path, a telephone number, a token
+or a private network address. It reports the file, the line and the kind, never the value it found. Files
+git ignores, such as the build output, are not read. The forms are the testbed's policy (its
+`docs/checks.md`, 「The quick checks」), and the declaration names the allowed address.
 
 A home path means a path that names an account's home folder on Unix or Windows; a path written from
 the home folder with a tilde names no account and is not a finding. An example does not write a home
