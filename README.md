@@ -1,3 +1,5 @@
+**English** | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+
 # bmo-cli
 
 The platform's thin entry point, `bmo`. It holds no API and runs no service. Each unit ships its own
@@ -9,7 +11,7 @@ the way git finds `git-<command>`. A unit added later needs no new build of `bmo
 | Folder | Holds |
 |---|---|
 | `src/` | The library that reads the words, finds the unit commands and their nouns, resolves a command and hands it on, and the binary `bmo` |
-| `tests/` | The contract's tests, each running the built `bmo` against stand-in unit commands in a directory of its own, and the check over every tracked file for personal data |
+| `tests/` | The contract's tests, each running the built `bmo` against stand-in unit commands in a directory of its own |
 | `docs/` | The canonical statements of what `bmo` does, and the personal-data rule |
 
 At the root stand the Cargo manifest, the version, `testbed.toml` (bmo-testbed's declaration of how this
@@ -21,5 +23,6 @@ repository is tested, checked, built and deployed), the Korean ledger the testbe
 | Document | States |
 |---|---|
 | `docs/api.md` | The fixed API: how unit commands are found and declare their nouns, how a command is resolved and handed on, what `bmo` answers itself, and the home bridge |
+| `docs/boundary.md` | Where the boundary stands: it points to the fixed API in `docs/api.md`, for the units that name this repository's boundary document |
 | `docs/inventory.md` | What this repository takes from the single repository it was split out of, and what it leaves to the units |
-| `docs/PERSONAL-DATA.md` | What personal data never goes into this repository, what to write instead, and the check that reads every tracked file for it |
+| `docs/PERSONAL-DATA.md` | What personal data never goes into this repository, what to write instead, and the testbed's check that reads every tracked file for it |
