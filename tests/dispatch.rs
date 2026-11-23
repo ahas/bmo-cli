@@ -196,16 +196,16 @@ fn a_noun_two_unit_commands_declare_is_refused_naming_both() {
 #[test]
 fn the_git_rule_hands_the_words_after_the_first_to_the_command_it_names() {
   let bench = Bench::new();
-  // The word chain's command declares no nouns: asked `nouns`, it refuses the word.
+  // The word game's command declares no nouns: asked `nouns`, it refuses the word.
   bench.command(
-    "bmo-word-chain",
-    "if [ \"$1\" = nouns ]; then exit 2; fi\necho bmo-word-chain\nfor word in \"$@\"; do echo \"$word\"; done",
+    "bmo-word-game",
+    "if [ \"$1\" = nouns ]; then exit 2; fi\necho bmo-word-game\nfor word in \"$@\"; do echo \"$word\"; done",
   );
 
-  let output = bench.bmo(&["word-chain", "install", "--from", "book"]);
+  let output = bench.bmo(&["word-game", "install", "--from", "book"]);
 
   assert!(output.status.success(), "{}", errors(&output));
-  assert_eq!(lines(&output), ["bmo-word-chain", "install", "--from", "book"]);
+  assert_eq!(lines(&output), ["bmo-word-game", "install", "--from", "book"]);
 }
 
 #[test]
