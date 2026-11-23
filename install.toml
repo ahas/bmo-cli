@@ -1,0 +1,13 @@
+# What installing the entry command on a fresh machine needs, read by the testbed's install verb (bmo-testbed's
+# docs/install.md, 「The install declaration」). It runs no service and reads no settings: a deployment builds
+# `bmo` and links it into ~/.local/bin, so the machine needs only what that build runs.
+
+install = 1
+
+[[needs]]
+program = "cargo"
+what = "Rust's Cargo, which a deployment builds the `bmo` binary with (edition 2024, so Rust 1.85 or later): `curl https://sh.rustup.rs -sSf | sh`."
+
+[[needs]]
+program = "cc"
+what = "A C toolchain, whose linker Cargo links the binary with: the `build-essential` package."

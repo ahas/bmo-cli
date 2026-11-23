@@ -15,7 +15,7 @@
 | `docs/` | `bmo` の動作についての正典となる文書と、個人情報のルール |
 
 ルートには Cargo マニフェスト、バージョン、`testbed.toml`(このリポジトリのテスト・チェック・ビルド・デプロイ方法を記した
-bmo-testbed の宣言)、テストベッドの `korean` チェックが読む韓国語台帳、`rustfmt.toml`、`CLAUDE.md`、そして `LICENSE` の
+bmo-testbed の宣言)、`install.toml`(新しいマシンへのインストールに必要なものを記した、テストベッドの install 動詞が読む宣言)、テストベッドの `korean` チェックが読む韓国語台帳、`rustfmt.toml`、`CLAUDE.md`、そして `LICENSE` の
 MIT ライセンスが置かれています。
 
 ## ドキュメント
