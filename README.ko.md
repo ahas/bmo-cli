@@ -14,7 +14,7 @@
 | `tests/` | 계약 테스트. 각 테스트는 빌드된 `bmo`를 자체 디렉터리 안의 대역 유닛 명령에 대해 실행합니다 |
 | `docs/` | `bmo`가 하는 일에 대한 정본 문서와 개인 정보 규칙 |
 
-루트에는 Cargo 매니페스트, 버전, `testbed.toml`(이 저장소를 어떻게 테스트·검사·빌드·배포하는지 적은 bmo-testbed의
+루트에는 Cargo 매니페스트, `testbed.toml`(이 저장소를 어떻게 테스트·검사·빌드·배포하는지 적은 bmo-testbed의
 선언), `install.toml`(새 기계에 설치할 때 필요한 것을 적은, 테스트베드의 install 동사가 읽는 선언), 테스트베드의 `korean` 검사가 읽는 한국어 대장, `rustfmt.toml`, `CLAUDE.md`, 그리고 `LICENSE`의 MIT 라이선스가
 있습니다.
 

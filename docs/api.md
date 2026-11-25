@@ -1,6 +1,6 @@
 # The fixed API: how `bmo` finds a unit's command and hands it on
 
-**Fixed at 0.1.0-rev.1.**
+**Fixed at the release the commit is tagged with.**
 
 `bmo` holds no API and runs no service. It reads the words it is given, finds the unit command that carries
 them, and hands them on; what it answers itself is the help, the version, a refusal and its one verb, `use`,
@@ -341,6 +341,7 @@ route. `use` calls each across that published contract and reads nothing else of
 
 ## Versioning
 
-- **The contract carries the repository's one version,** the version in `VERSION` and the Cargo manifest. It
-  moves only at a release the owner declares, as bmo-chat's `docs/conventions.md` 「Versions」 states; a
-  contract change moves none, and a deployment is told apart by its commit.
+- **The version is the set's,** read off the git tag when a build is made and handed to the build as
+  `BMO_VERSION`, as bmo-chat's `docs/conventions.md` 「Versions」 states; `bmo --version` prints it. The Cargo
+  manifest's version is a placeholder that never moves; a contract change moves no version, and a deployment
+  is told apart by its commit.

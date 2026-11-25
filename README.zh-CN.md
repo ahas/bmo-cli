@@ -13,7 +13,7 @@
 | `tests/` | 契约测试,每个测试都在独立目录中让构建好的 `bmo` 对替身单元命令运行 |
 | `docs/` | 关于 `bmo` 行为的权威文档,以及个人数据规则 |
 
-根目录下有 Cargo 清单、版本文件、`testbed.toml`(bmo-testbed 的声明,说明本仓库如何测试、检查、构建和部署)、`install.toml`(说明在新机器上安装时需要什么,由测试台的 install 动词读取)、测试台
+根目录下有 Cargo 清单、`testbed.toml`(bmo-testbed 的声明,说明本仓库如何测试、检查、构建和部署)、`install.toml`(说明在新机器上安装时需要什么,由测试台的 install 动词读取)、测试台
 `korean` 检查读取的韩语台账、`rustfmt.toml`、`CLAUDE.md`,以及 `LICENSE` 中的 MIT 许可证。
 
 ## 文档

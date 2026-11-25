@@ -304,13 +304,13 @@ fn help_with_words_asks_the_unit_command_for_its_own_help() {
 }
 
 #[test]
-fn the_version_is_the_packages() {
+fn the_version_is_the_builds() {
   let bench = Bench::new();
 
   let output = bench.bmo(&["--version"]);
 
   assert!(output.status.success());
-  assert_eq!(lines(&output), [format!("bmo {}", env!("CARGO_PKG_VERSION"))]);
+  assert_eq!(lines(&output), [format!("bmo {}", bmo_cli::VERSION)]);
 }
 
 #[test]

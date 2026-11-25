@@ -53,7 +53,8 @@ A change is not done before stage 3 has passed.
 
 ## Releasing
 
-- The version stands in `VERSION` and in the Cargo manifest, the same in both. It moves only at a release
-  the owner declares, as bmo-chat's `docs/conventions.md` 「Versions」 states; a commit, a deploy, a fix or a
-  contract change moves none, and a deployment is told apart by its commit.
+- The version is the set's, read off the git tag when a build is made: the testbed hands it to the build as
+  `BMO_VERSION`, and `bmo --version` prints it, as bmo-chat's `docs/conventions.md` 「Versions」 states. The
+  Cargo manifest's version is a placeholder that never moves; a commit, a deploy, a fix or a contract change
+  moves no version, and a deployment is told apart by its commit.
 - bmo-testbed builds and deploys this repository by `testbed.toml`.

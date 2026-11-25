@@ -20,6 +20,13 @@ use clap::Parser;
 use crate::line::Line;
 use crate::resolve::Resolution;
 
+/// The version `bmo --version` prints: the set's version the build was made at, which the testbed hands the
+/// build as `BMO_VERSION`, else the manifest's placeholder (bmo-chat's `docs/conventions.md`, 「Versions」).
+pub const VERSION: &str = match option_env!("BMO_VERSION") {
+  Some(version) => version,
+  None => env!("CARGO_PKG_VERSION"),
+};
+
 /// Reads the command line `bmo` was given and hands the command to whoever carries it, or answers it.
 pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
   let arguments: Vec<OsString> = arguments.into_iter().collect();
@@ -29,7 +36,7 @@ pub fn run(arguments: impl IntoIterator<Item = OsString>) -> ExitCode {
   };
 
   if line.version {
-    println!("bmo {}", env!("CARGO_PKG_VERSION"));
+    println!("bmo {VERSION}");
 
     return ExitCode::SUCCESS;
   }
