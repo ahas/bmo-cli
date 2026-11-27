@@ -128,7 +128,7 @@ route. `use` calls each across that published contract and reads nothing else of
 | `bmo use <tool> [--sync] [--arg <key>=<value>]… [--json <object>]` | calls the tool and waits for its answer |
 | `bmo use <tool> --async [--memory <words>] [--room <room>] [--agent <name>] [--arg …]… [--json …]` | asks the tool host to run the call and answers its id |
 | `bmo use --tools [--query <words>]` | the tools `use` reaches, one a line |
-| `bmo use <tool> --describe` | the tool as the host describes it, as JSON |
+| `bmo use <tool> --describe` | the tool as the host describes it, as text to read; with `--raw`, as JSON |
 | `bmo use --list` | every call kept, one a line |
 | `bmo use --status <id>` | one call, as JSON |
 | `bmo use --help` | the verb's usage |
@@ -154,9 +154,12 @@ route. `use` calls each across that published contract and reads nothing else of
   their own names, as the tool host states it; a tool the session is shown by its own name is called through `use`
   as well, by its full name. Where none is listed, `use` says so on standard error and ends with 0. A refusal of
   the list is said as a call's is (「The answer」), the tool named `list`.
-- **`<tool> --describe` asks the toolbook's `describe`** and writes its structured content as one JSON object: the
-  tool in the shape the tool host answers a tool in, whose `description`, `manual`, `input`, `output`, `hints` and
-  `reachedBy` say what it does, how its arguments are filled and which of `call` and `act` reaches it. An unknown
+- **`<tool> --describe` asks the toolbook's `describe`** and writes it as text to read: the tool's name and which
+  of `call` and `act` reaches it, its description, its manual as written, each argument on a line of its own (its
+  type, whether it is required, its description, its values and its default), the shape of its answer where it
+  names one, and how a call of it is written, with the line that an answer marked `isError` is a refusal. With
+  `--raw` it writes the structured content as one JSON object instead: the tool in the shape the tool host answers
+  a tool in, whose `description`, `manual`, `input`, `output`, `hints` and `reachedBy` say the same. An unknown
   tool is refused as a call of it is.
 
 ### The arguments

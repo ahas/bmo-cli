@@ -3,6 +3,7 @@
 //! verb」).
 
 pub mod calls;
+pub mod described;
 pub mod ground;
 pub mod record;
 pub mod toolbook;
@@ -30,9 +31,12 @@ pub struct UseLine {
   /// The tool's full name, `<namespace>/<name>`.
   #[arg(value_name = "TOOL", required_unless_present_any = ["list", "status", "run", "tools", "ended", "wake"])]
   pub tool: Option<String>,
-  /// Print the tool as the host describes it, as JSON, instead of calling it.
+  /// Print the tool as the host describes it, as text to read, instead of calling it.
   #[arg(long, conflicts_with_all = ["asynchronous", "sync", "args", "json"])]
   pub describe: bool,
+  /// With --describe, print the host's object as JSON instead of the text.
+  #[arg(long, requires = "describe")]
+  pub raw: bool,
   /// Call the tool and wait for its answer (the default).
   #[arg(long, conflicts_with = "asynchronous")]
   pub sync: bool,
@@ -126,7 +130,11 @@ pub fn run(words: &[OsString], via: Option<&str>) -> ExitCode {
   };
 
   if line.describe {
-    println!("{}", serde_json::to_string_pretty(&described.shape).unwrap_or_default());
+    if line.raw {
+      println!("{}", serde_json::to_string_pretty(&described.shape).unwrap_or_default());
+    } else {
+      print!("{}", described::text(&tool, &described.shape));
+    }
 
     return ExitCode::SUCCESS;
   }

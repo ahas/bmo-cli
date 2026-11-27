@@ -712,7 +712,7 @@ fn the_tools_are_listed_one_a_line_and_narrowed_by_a_query() {
 fn a_tool_described_is_printed_as_the_hosts_object_and_not_called() {
   let stage = Stage::new();
 
-  let output = stage.bmo(&["use", "bmo/say", "--describe"]);
+  let output = stage.bmo(&["use", "bmo/say", "--describe", "--raw"]);
 
   assert!(output.status.success(), "{}", errors(&output));
 
@@ -724,6 +724,23 @@ fn a_tool_described_is_printed_as_the_hosts_object_and_not_called() {
   assert_eq!(stage.asked(), [("describe".to_owned(), "bmo/say".to_owned())]);
   assert_eq!(stage.bmo(&["use", "web/nope", "--describe"]).status.code(), Some(1));
   assert_eq!(stage.bmo(&["use", "bmo/say", "--describe", "--async"]).status.code(), Some(2));
+  assert_eq!(stage.bmo(&["use", "bmo/say", "--raw"]).status.code(), Some(2));
+}
+
+#[test]
+fn a_tool_described_is_printed_as_text_to_read() {
+  let stage = Stage::new();
+  let output = stage.bmo(&["use", "bmo/say", "--describe"]);
+
+  assert!(output.status.success(), "{}", errors(&output));
+
+  let text = String::from_utf8(output.stdout).unwrap();
+
+  assert!(text.starts_with("bmo/say (reached by act)\n"), "{text}");
+  assert!(text.contains("Manual:\nCall bmo/say well."), "{text}");
+  assert!(text.contains("- text (string, "), "{text}");
+  assert!(text.contains("bmo use bmo/say --json"), "{text}");
+  assert!(text.contains("isError"), "{text}");
 }
 
 #[test]
